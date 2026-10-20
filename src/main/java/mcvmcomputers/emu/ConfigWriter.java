@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import mcvmcomputers.emu.Catalog.Card;
 import mcvmcomputers.emu.Catalog.CardCategory;
 import mcvmcomputers.emu.Catalog.Machine;
 import mcvmcomputers.emu.HardwareSpec.CardPart;
@@ -181,6 +182,20 @@ public final class ConfigWriter {
 			}
 		} else {
 			ini.set("Video", "gfxcard", "none");
+		}
+
+		// Add-on accelerators (Voodoo, 8514/A, XGA, DA2): a switch in [Video], settings in their own section.
+		for (CardPart c : byCategory(spec, CardCategory.ACCEL)) {
+			Card card = cat == null ? null : cat.card(CardCategory.ACCEL, c.id);
+			if (card == null || card.configKey == null || (m != null && !card.fits(m))) {
+				continue;
+			}
+			ini.set("Video", card.configKey, "1");
+			if (card.section != null) {
+				for (Map.Entry<String, String> e : card.resolve(c.options).entrySet()) {
+					ini.set(card.section, e.getKey(), e.getValue());
+				}
+			}
 		}
 
 		// Sound: up to four cards; the board's own sound when there are none.

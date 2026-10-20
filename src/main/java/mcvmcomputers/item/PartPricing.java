@@ -51,6 +51,13 @@ public final class PartPricing {
 				return 3;
 			case SCSI:
 				return 5;
+			case ACCEL: {
+				// Voodoo 2 class cards cost more; a second board for SLI doubles the price.
+				CompoundTag o = p.getCompound("Options");
+				String type = o.getString("type");
+				int base = type.endsWith("_2") || type.contains("sb50") ? 9 : 7;
+				return "1".equals(o.getString("sli")) ? base * 2 : base;
+			}
 			case HDC:
 				return 2;
 			default:

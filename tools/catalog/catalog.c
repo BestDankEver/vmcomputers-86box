@@ -27,6 +27,9 @@
 #include <86box/machine.h>
 #include "cpu.h"
 #include <86box/video.h>
+#include <86box/vid_8514a_device.h>
+#include <86box/vid_xga_device.h>
+#include <86box/vid_ps55da2.h>
 #include <86box/sound.h>
 #include <86box/network.h>
 #include <86box/scsi.h>
@@ -169,6 +172,243 @@ static int             h_avail(int c) { return hdc_available(c); }
 static const device_t *f_dev(int c) { return fdc_card_getdevice(c); }
 static const char     *f_name(int c) { return fdc_card_get_internal_name(c); }
 static int             f_avail(int c) { return fdc_card_available(c); }
+
+/* ---- Graphics accelerators ------------------------------------------------------
+ *
+ * The Voodoo, 8514/A, XGA and Display Adapter II are not in 86Box's video card
+ * list: they are add-ons that sit next to the main card, switched on by their
+ * own key in the [Video] section. 86Box has no table of them (the Display
+ * settings page checks for each one by hand), so this mirrors those checks in
+ * qt_settingsdisplay.cpp: which boards can take each one, and which main cards
+ * rule it out.
+ */
+typedef struct accel_t {
+    const char     *id;      /* catalog id */
+    const char     *key;     /* [Video] key that switches it on */
+    const device_t *dev;     /* the device whose config section holds the options */
+    uintptr_t       bus;     /* machine bus it needs */
+    uintptr_t       not_bus; /* ...unless the machine also has this one (0 = no exception) */
+    int             conflict_type; /* VIDEO_FLAG_TYPE_* of main cards that already have it, -1 = none */
+    int             needs_available; /* the device has its own ROM check */
+} accel_t;
+
+static const accel_t accels[] = {
+    { "voodoo",   "voodoo", &voodoo_device,      MACHINE_BUS_PCI,   0,               -1,                   0 },
+    { "8514_isa", "8514a",  &gen8514_isa_device, MACHINE_BUS_ISA16, MACHINE_BUS_MCA, VIDEO_FLAG_TYPE_8514, 0 },
+    { "8514_mca", "8514a",  &ibm8514_mca_device, MACHINE_BUS_MCA,   0,               VIDEO_FLAG_TYPE_8514, 0 },
+    { "xga_mca",  "xga",    &xga_device,         MACHINE_BUS_MCA,   0,               VIDEO_FLAG_TYPE_XGA,  1 },
+    { "ps55da2",  "da2",    &ps55da2_device,     MACHINE_BUS_MCA,   0,               VIDEO_FLAG_TYPE_DA2,  1 },
+};
+
+static int
+accel_fits(const accel_t *a, int m)
+{
+    if (!machine_has_bus(m, a->bus))
+        return 0;
+    if (a->not_bus && machine_has_bus(m, a->not_bus))
+        return 0;
+    return 1;
+}
+
+static void
+accel_machine_bitset(const accel_t *a)
+{
+    char *hex = calloc((size_t) (navail / 4) + 2, 1);
+    for (int i = 0; i < navail; i += 4) {
+        int nib = 0;
+        for (int b = 0; b < 4; b++) {
+            nib <<= 1;
+            if (((i + b) < navail) && accel_fits(a, avail[i + b]))
+                nib |= 1;
+        }
+        hex[i / 4] = "0123456789abcdef"[nib];
+    }
+    jstr(hex);
+    free(hex);
+}
+
+/* The settings page greys out the add-on Voodoo whenever the main card's name looks like a 3dfx card. */
+static int
+looks_like_3dfx(const char *s)
+{
+    char low[600];
+    int  i;
+    for (i = 0; s[i] && (i < (int) sizeof(low) - 1); i++)
+        low[i] = (s[i] >= 'A' && s[i] <= 'Z') ? (s[i] + 32) : s[i];
+    low[i] = '\0';
+    return strstr(low, "3dfx") || strstr(low, "voodoo") || strstr(low, "banshee") || strstr(low, "raven");
+}
+
+static void
+accel_conflicts(const accel_t *a)
+{
+    char name[600];
+    int  n = 0;
+
+    fputs("[", out);
+    for (int c = 0;; c++) {
+        const char     *in  = video_get_internal_name(c);
+        const device_t *dev = video_card_getdevice(c);
+        if ((in == NULL) || (in[0] == '\0'))
+            break;
+        if ((dev == NULL) || (dev->init == NULL))
+            continue;
+        int clash;
+        if (a->conflict_type < 0) {
+            device_display_name(dev, name);
+            clash = looks_like_3dfx(name);
+        } else
+            clash = (video_card_get_flags(c) == a->conflict_type);
+        if (clash) {
+            fputs(n++ ? ", " : "", out);
+            jstr(in);
+        }
+    }
+    fputs("]", out);
+}
+
+static int
+bios_roms_present(const device_config_bios_t *b)
+{
+    int p = 0;
+    if (b->files_no < 0)
+        return 1;
+    for (int d = 0; d < b->files_no; d++)
+        p += !!rom_present(b->files[d]);
+    return p == b->files_no;
+}
+
+/*
+ * A device's settings, as its Configure dialog shows them. Only kinds the mod
+ * can offer as buttons are written: variants (CONFIG_BIOS), on/off switches,
+ * lists of choices and spinners. Values are strings exactly as 86Box stores
+ * them in its config file. Anything else keeps 86Box's default.
+ */
+static void
+device_options(const device_t *dev)
+{
+    char buf[64];
+    int  n = 0;
+
+    fputs("[", out);
+    for (const device_config_t *c = dev->config; (c != NULL) && (c->type != CONFIG_END); c++) {
+        const int type = c->type & CONFIG_TYPE_MASK;
+        if ((c->name == NULL) || (c->name[0] == '\0'))
+            continue;
+        switch (type) {
+            case CONFIG_BIOS:
+            case CONFIG_BINARY:
+            case CONFIG_SELECTION:
+            case CONFIG_HEX16:
+            case CONFIG_HEX20:
+            case CONFIG_SPINNER:
+                break;
+            default:
+                continue;
+        }
+        fprintf(out, "%s\n        {\"name\": ", n++ ? "," : "");
+        jstr(c->name);
+        fputs(", \"label\": ", out);
+        jstr(c->description);
+
+        if (type == CONFIG_BIOS) {
+            fputs(", \"kind\": \"variant\", \"default\": ", out);
+            jstr(c->default_string);
+            fputs(", \"choices\": [", out);
+            int k = 0;
+            for (const device_config_bios_t *b = c->bios; (b->name != NULL) && (b->internal_name != NULL) &&
+                                                         (b->name[0] != '\0') && (b->files_no != 0); b++) {
+                if (!bios_roms_present(b))
+                    continue;
+                fprintf(out, "%s{\"value\": ", k++ ? ", " : "");
+                jstr(b->internal_name);
+                fputs(", \"label\": ", out);
+                jstr(b->name);
+                /* Memory limits of this variant, applied to the "memory" (or
+                   "framebuffer_memory") and "texture_memory" options. */
+                if (b->flags & BIOS_LIMIT_MIN_MEMORY)
+                    fprintf(out, ", \"mem_min\": %d", (int) (b->flags & 0xff));
+                if (b->flags & BIOS_LIMIT_MAX_MEMORY)
+                    fprintf(out, ", \"mem_max\": %d", (int) ((b->flags >> 8) & 0xff));
+                if (b->flags & BIOS_LIMIT_MIN_MEMORY_2)
+                    fprintf(out, ", \"mem2_min\": %d", (int) ((b->flags >> 16) & 0xff));
+                if (b->flags & BIOS_LIMIT_MAX_MEMORY_2)
+                    fprintf(out, ", \"mem2_max\": %d", (int) ((b->flags >> 24) & 0xff));
+                if (b->flags & BIOS_FIXED_MEMORY)
+                    fputs(", \"mem_fixed\": true", out);
+                fputs("}", out);
+            }
+            fputs("]}", out);
+            continue;
+        }
+
+        if (type == CONFIG_BINARY) {
+            fprintf(out, ", \"kind\": \"toggle\", \"default\": \"%d\"}", c->default_int ? 1 : 0);
+            continue;
+        }
+
+        if (type == CONFIG_SPINNER) {
+            fprintf(out, ", \"kind\": \"spinner\", \"default\": \"%d\", \"min\": %d, \"max\": %d, \"step\": %d}",
+                    c->default_int, c->spinner.min, c->spinner.max, c->spinner.step ? c->spinner.step : 1);
+            continue;
+        }
+
+        /* Selections; hex ones are stored in hex. */
+        const char *fmt = (type == CONFIG_HEX16) ? "%04X" : (type == CONFIG_HEX20) ? "%05X" : "%d";
+        snprintf(buf, sizeof(buf), fmt, c->default_int);
+        fputs(", \"kind\": \"select\", \"default\": ", out);
+        jstr(buf);
+        fputs(", \"choices\": [", out);
+        int k = 0;
+        for (const device_config_selection_t *s = c->selection; (s->description != NULL) && (s->description[0] != '\0'); s++) {
+            snprintf(buf, sizeof(buf), fmt, s->value);
+            fprintf(out, "%s{\"value\": ", k++ ? ", " : "");
+            jstr(buf);
+            fputs(", \"label\": ", out);
+            jstr(s->description);
+            fputs("}", out);
+        }
+        fputs("]}", out);
+    }
+    fputs(n ? "\n      ]" : "]", out);
+}
+
+static void
+accel_list(int *first)
+{
+    char name[600];
+    int  n = 0;
+
+    fprintf(out, "%s\n  ", *first ? "" : ",");
+    *first = 0;
+    jstr("accel");
+    fputs(": [", out);
+    for (size_t i = 0; i < sizeof(accels) / sizeof(accels[0]); i++) {
+        const accel_t *a = &accels[i];
+        if (a->needs_available && !device_available(a->dev))
+            continue;
+        device_display_name(a->dev, name);
+        fprintf(out, "%s\n    {\"id\": ", n ? "," : "");
+        jstr(a->id);
+        fputs(", \"name\": ", out);
+        jstr(name);
+        fprintf(out, ", \"flags\": %" PRIu32 ", \"machines\": ", (uint32_t) a->dev->flags);
+        accel_machine_bitset(a);
+        fputs(",\n      \"key\": ", out);
+        jstr(a->key);
+        /* 86Box keeps a device's settings in a section named after the device. */
+        fputs(", \"section\": ", out);
+        jstr(a->dev->name);
+        fputs(", \"conflicts\": ", out);
+        accel_conflicts(a);
+        fputs(",\n      \"options\": ", out);
+        device_options(a->dev);
+        fputs("}", out);
+        n++;
+    }
+    fputs("\n  ]", out);
+    fprintf(stderr, "accel: %d\n", n);
+}
 
 static const char *
 onboard(const device_t *dev)
@@ -330,6 +570,7 @@ main(int argc, char **argv)
     device_list("scsi", sc_dev, sc_name, sc_avail, &first);
     device_list("hdc", h_dev, h_name, h_avail, &first);
     device_list("fdc", f_dev, f_name, f_avail, &first);
+    accel_list(&first);
     fputs("\n  }\n}\n", out);
 
     fclose(out);

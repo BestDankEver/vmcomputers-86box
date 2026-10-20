@@ -9,9 +9,12 @@ import java.util.BitSet;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Everything 86Box can emulate, as generated from an 86Box build by
@@ -31,7 +34,9 @@ public final class Catalog {
 		NETWORK("network", "Network card"),
 		SCSI("scsi", "SCSI controller"),
 		HDC("hdc", "Hard disk controller"),
-		FDC("fdc", "Floppy controller");
+		FDC("fdc", "Floppy controller"),
+		/** Add-on cards that sit next to the main video card: 3dfx Voodoo, 8514/A, XGA, Display Adapter II. */
+		ACCEL("accel", "Graphics accelerator");
 
 		public final String key;
 		public final String label;
@@ -161,23 +166,257 @@ public final class Catalog {
 		}
 	}
 
+	/** One choice of a {@link CardOption}. Memory limits only apply to variants. */
+	public static final class OptionChoice {
+		public final String value;
+		public final String label;
+		/** Limits this variant puts on the "framebuffer_memory"/"memory" option (1) and "texture_memory" (2); -1 = none. */
+		public final int memMin, memMax, mem2Min, mem2Max;
+		public final boolean memFixed;
+
+		OptionChoice(String value, String label, int memMin, int memMax, int mem2Min, int mem2Max, boolean memFixed) {
+			this.value = value;
+			this.label = label;
+			this.memMin = memMin;
+			this.memMax = memMax;
+			this.mem2Min = mem2Min;
+			this.mem2Max = mem2Max;
+			this.memFixed = memFixed;
+		}
+	}
+
+	/**
+	 * A setting from the card's 86Box Configure dialog. Values are strings
+	 * exactly as 86Box writes them in its config file.
+	 */
+	public static final class CardOption {
+		public static final String VARIANT = "variant", TOGGLE = "toggle", SELECT = "select", SPINNER = "spinner";
+
+		public final String name;
+		public final String label;
+		public final String kind;
+		public final String def;
+		public final List<OptionChoice> choices;
+		public final int min, max, step;
+
+		CardOption(String name, String label, String kind, String def, List<OptionChoice> choices, int min, int max, int step) {
+			this.name = name;
+			this.label = label;
+			this.kind = kind;
+			this.def = def;
+			this.choices = choices;
+			this.min = min;
+			this.max = max;
+			this.step = step;
+		}
+
+		public OptionChoice choice(String value) {
+			for (OptionChoice c : choices) {
+				if (c.value.equals(value)) {
+					return c;
+				}
+			}
+			return null;
+		}
+
+		/** Which memory option a variant's limits apply to: 1, 2, or 0 for neither. */
+		public static int memorySlot(String name) {
+			if ("memory".equals(name) || "framebuffer_memory".equals(name)) {
+				return 1;
+			}
+			return "texture_memory".equals(name) ? 2 : 0;
+		}
+
+		/** Whether {@code value} is allowed for this option once the variant {@code v} is chosen. */
+		public boolean allowed(String value, OptionChoice v) {
+			int slot = memorySlot(name);
+			if (v == null || slot == 0) {
+				return true;
+			}
+			int n;
+			try {
+				n = Integer.parseInt(value);
+			} catch (NumberFormatException e) {
+				return true;
+			}
+			if (slot == 1) {
+				if (v.memFixed) {
+					return value.equals(def);
+				}
+				return (v.memMin < 0 || n >= v.memMin) && (v.memMax < 0 || n <= v.memMax);
+			}
+			return (v.mem2Min < 0 || n >= v.mem2Min) && (v.mem2Max < 0 || n <= v.mem2Max);
+		}
+	}
+
 	public static final class Card {
 		public final CardCategory category;
 		public final String id;
 		public final String name;
 		public final long deviceFlags;
 		private final BitSet machines;
+		/** Add-on cards only: the [Video] key that switches it on (e.g. "voodoo"). */
+		public final String configKey;
+		/** The 86Box config section holding this card's settings (its device name). */
+		public final String section;
+		/** Add-on cards only: main video cards it can't be used alongside. */
+		public final Set<String> conflicts;
+		public final List<CardOption> options;
 
-		Card(CardCategory category, String id, String name, long deviceFlags, BitSet machines) {
+		Card(CardCategory category, String id, String name, long deviceFlags, BitSet machines, String configKey,
+				String section, Set<String> conflicts, List<CardOption> options) {
 			this.category = category;
 			this.id = id;
 			this.name = name;
 			this.deviceFlags = deviceFlags;
 			this.machines = machines;
+			this.configKey = configKey;
+			this.section = section;
+			this.conflicts = conflicts;
+			this.options = options;
 		}
 
 		public boolean fits(Machine m) {
 			return m != null && machines.get(m.index);
+		}
+
+		public CardOption option(String name) {
+			for (CardOption o : options) {
+				if (o.name.equals(name)) {
+					return o;
+				}
+			}
+			return null;
+		}
+
+		/** The variant chosen in {@code values}, or the default one. */
+		public OptionChoice variant(Map<String, String> values) {
+			for (CardOption o : options) {
+				if (CardOption.VARIANT.equals(o.kind)) {
+					String v = values == null ? null : values.get(o.name);
+					OptionChoice c = o.choice(v == null ? o.def : v);
+					return c != null ? c : (o.choices.isEmpty() ? null : o.choices.get(0));
+				}
+			}
+			return null;
+		}
+
+		/**
+		 * Every option with a valid value: what {@code values} sets where it is
+		 * still allowed, the default otherwise (moved into the variant's memory
+		 * limits the way 86Box's Configure dialog does).
+		 */
+		public Map<String, String> resolve(Map<String, String> values) {
+			Map<String, String> out = new LinkedHashMap<>();
+			OptionChoice variant = variant(values);
+			for (CardOption o : options) {
+				String v = values == null ? null : values.get(o.name);
+				if (CardOption.VARIANT.equals(o.kind)) {
+					out.put(o.name, variant == null ? o.def : variant.value);
+					continue;
+				}
+				if (v == null || !valid(o, v)) {
+					v = o.def;
+				}
+				if (!o.allowed(v, variant)) {
+					v = nearestAllowed(o, v, variant);
+				}
+				out.put(o.name, v);
+			}
+			return out;
+		}
+
+		private static boolean valid(CardOption o, String v) {
+			switch (o.kind) {
+			case CardOption.TOGGLE:
+				return v.equals("0") || v.equals("1");
+			case CardOption.SPINNER:
+				try {
+					int n = Integer.parseInt(v);
+					return n >= o.min && n <= o.max;
+				} catch (NumberFormatException e) {
+					return false;
+				}
+			default:
+				return o.choice(v) != null;
+			}
+		}
+
+		private static String nearestAllowed(CardOption o, String v, OptionChoice variant) {
+			String best = v;
+			long bestDist = Long.MAX_VALUE;
+			long want;
+			try {
+				want = Long.parseLong(v);
+			} catch (NumberFormatException e) {
+				want = 0;
+			}
+			for (OptionChoice c : o.choices) {
+				if (!o.allowed(c.value, variant)) {
+					continue;
+				}
+				long d;
+				try {
+					d = Math.abs(Long.parseLong(c.value) - want);
+				} catch (NumberFormatException e) {
+					d = Long.MAX_VALUE - 1;
+				}
+				if (d < bestDist) {
+					bestDist = d;
+					best = c.value;
+				}
+			}
+			return best;
+		}
+
+		/** The option that picks the model (CONFIG_BIOS), if the card has one. */
+		public CardOption variantOption() {
+			for (CardOption o : options) {
+				if (CardOption.VARIANT.equals(o.kind)) {
+					return o;
+				}
+			}
+			return null;
+		}
+
+		/** The card's name with the chosen model, e.g. "[PCI] 3Dfx Voodoo 2". */
+		public String displayName(Map<String, String> values) {
+			OptionChoice v = variant(values);
+			if (v == null || v.label.isEmpty()) {
+				return name;
+			}
+			int b = name.indexOf("] ");
+			return (name.startsWith("[") && b > 0 ? name.substring(0, b + 2) : "") + v.label;
+		}
+
+		/** A short summary of the options that differ from the defaults (the model is in the name). */
+		public String optionSummary(Map<String, String> values) {
+			StringBuilder b = new StringBuilder();
+			Map<String, String> r = resolve(values);
+			for (CardOption o : options) {
+				String v = r.get(o.name);
+				String part = null;
+				if (CardOption.VARIANT.equals(o.kind)) {
+					continue;
+				}
+				if (!v.equals(o.def) || CardOption.memorySlot(o.name) != 0) {
+					if (CardOption.TOGGLE.equals(o.kind)) {
+						part = o.label + (v.equals("1") ? " on" : " off");
+					} else if (CardOption.SPINNER.equals(o.kind)) {
+						part = o.label + " " + v;
+					} else {
+						OptionChoice c = o.choice(v);
+						part = o.label + ": " + (c == null ? v : c.label);
+					}
+				}
+				if (part != null) {
+					if (b.length() > 0) {
+						b.append(", ");
+					}
+					b.append(part);
+				}
+			}
+			return b.toString();
 		}
 	}
 
@@ -294,8 +533,16 @@ public final class Catalog {
 			if (cardsObj != null) {
 				for (Object o : Json.arr(cardsObj, cat.key)) {
 					Map<String, Object> m = asObj(o);
+					Set<String> conflicts = new HashSet<>();
+					for (Object x : Json.arr(m, "conflicts")) {
+						if (x instanceof String) {
+							conflicts.add((String) x);
+						}
+					}
 					Card c = new Card(cat, Json.str(m, "id", ""), Json.str(m, "name", ""),
-							Json.lng(m, "flags", 0), hexBits(Json.str(m, "machines", ""), ms.size()));
+							Json.lng(m, "flags", 0), hexBits(Json.str(m, "machines", ""), ms.size()),
+							Json.str(m, "key", null), Json.str(m, "section", null),
+							Collections.unmodifiableSet(conflicts), parseOptions(Json.arr(m, "options")));
 					list.add(c);
 					cardsByKey.put(cat.key + ":" + c.id, c);
 				}
@@ -322,6 +569,29 @@ public final class Catalog {
 			cdromById.put(d.id, d);
 		}
 		cdromDrives = Collections.unmodifiableList(cds);
+	}
+
+	private static List<CardOption> parseOptions(List<Object> arr) {
+		List<CardOption> out = new ArrayList<>();
+		for (Object o : arr) {
+			Map<String, Object> m = asObj(o);
+			List<OptionChoice> choices = new ArrayList<>();
+			for (Object c : Json.arr(m, "choices")) {
+				Map<String, Object> cm = asObj(c);
+				choices.add(new OptionChoice(Json.str(cm, "value", ""), Json.str(cm, "label", ""),
+						Json.integer(cm, "mem_min", -1), Json.integer(cm, "mem_max", -1),
+						Json.integer(cm, "mem2_min", -1), Json.integer(cm, "mem2_max", -1),
+						Json.bool(cm, "mem_fixed", false)));
+			}
+			String kind = Json.str(m, "kind", "");
+			if ((CardOption.VARIANT.equals(kind) || CardOption.SELECT.equals(kind)) && choices.isEmpty()) {
+				continue;
+			}
+			out.add(new CardOption(Json.str(m, "name", ""), Json.str(m, "label", ""), kind, Json.str(m, "default", ""),
+					Collections.unmodifiableList(choices), Json.integer(m, "min", 0), Json.integer(m, "max", 0),
+					Json.integer(m, "step", 1)));
+		}
+		return Collections.unmodifiableList(out);
 	}
 
 	@SuppressWarnings("unchecked")

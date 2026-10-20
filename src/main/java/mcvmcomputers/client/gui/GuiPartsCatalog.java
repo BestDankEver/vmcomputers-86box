@@ -1,7 +1,9 @@
 package mcvmcomputers.client.gui;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 import java.util.function.Supplier;
 
@@ -50,12 +52,17 @@ public class GuiPartsCatalog extends Screen {
 		final String name;
 		final String detail;
 		final Supplier<ItemStack> make;
+		/** A card with settings to pick before it goes in the cart, and the ones this entry starts with. */
+		final Card configurable;
+		final Map<String, String> preset;
 		int price = -1;
 
-		Entry(String name, String detail, Supplier<ItemStack> make) {
+		Entry(String name, String detail, Supplier<ItemStack> make, Card configurable, Map<String, String> preset) {
 			this.name = name;
 			this.detail = detail;
 			this.make = make;
+			this.configurable = configurable;
+			this.preset = preset;
 		}
 
 		int price() {
@@ -159,6 +166,8 @@ public class GuiPartsCatalog extends Screen {
 			}
 			break;
 		case VIDEO:
+			// 3D accelerators and other add-ons first: there are only a few, below 150-odd main cards.
+			cards(cat, CardCategory.ACCEL, fit, q);
 			cards(cat, CardCategory.VIDEO, fit, q);
 			break;
 		case SOUND:
@@ -193,14 +202,37 @@ public class GuiPartsCatalog extends Screen {
 			if (fit && !card.fits(target)) {
 				continue;
 			}
-			add(card.name, lang.get("mcvmcomputers.part.card." + c.key), () -> ItemPart.card(card), q);
+			String detail = lang.get("mcvmcomputers.part.card." + c.key);
+			Catalog.CardOption models = card.variantOption();
+			if (models == null) {
+				add(card.name, detail, () -> ItemPart.card(card), q, card.options.isEmpty() ? null : card, null);
+				continue;
+			}
+			// One entry per model, e.g. Voodoo Graphics and Voodoo 2 from the one Voodoo device.
+			for (Catalog.OptionChoice v : models.choices) {
+				Map<String, String> preset = Collections.singletonMap(models.name, v.value);
+				add(card.displayName(preset), detail, () -> ItemPart.card(card, preset), q, card, preset);
+			}
 		}
 	}
 
 	private void add(String name, String detail, Supplier<ItemStack> make, String q) {
+		add(name, detail, make, q, null, null);
+	}
+
+	private void add(String name, String detail, Supplier<ItemStack> make, String q, Card configurable, Map<String, String> preset) {
 		if (q.isEmpty() || name.toLowerCase(Locale.ROOT).contains(q) || detail.toLowerCase(Locale.ROOT).contains(q)) {
-			entries.add(new Entry(name, detail, make));
+			entries.add(new Entry(name, detail, make, configurable, preset));
 		}
+	}
+
+	private void addToCart(ItemStack s, String name) {
+		if (ClientMod.tabletOS == null) {
+			return;
+		}
+		ClientMod.tabletOS.addToCart(s);
+		flash = lang.get("mcvmcomputers.catalog.added").replace("%s", name);
+		flashUntil = System.currentTimeMillis() + 2000;
 	}
 
 	private int listTop() {
@@ -290,17 +322,23 @@ public class GuiPartsCatalog extends Screen {
 			if (!e.detail.isEmpty()) {
 				labels.add(new Object[] { Math.max(70, priceX - 200), y + 3, 0x888888, this.textRenderer.trimToWidth(e.detail, 190) });
 			}
-			labels.add(new Object[] { priceX, y + 3, 0xdddddd, lang.get("mcvmcomputers.catalog.price").replace("%s", "" + e.price()) });
-			this.addButton(new ButtonWidget(this.width - 52, y, 46, 13, new LiteralText(lang.get("mcvmcomputers.catalog.add")), b -> {
-				if (ClientMod.tabletOS != null) {
-					ItemStack s = e.make.get();
-					ClientMod.tabletOS.addToCart(s);
-					flash = lang.get("mcvmcomputers.catalog.added").replace("%s", e.name);
-					flashUntil = System.currentTimeMillis() + 2000;
-					if (s.getItem() == ItemList.ITEM_MOTHERBOARD) {
-						buildEntries(); // the new board becomes what "fits" means
-						rebuildRows();
-					}
+			String price = lang.get("mcvmcomputers.catalog.price").replace("%s", "" + e.price());
+			labels.add(new Object[] { priceX, y + 3, 0xdddddd, e.configurable == null ? price : price + "+" });
+			String addLabel = lang.get(e.configurable == null ? "mcvmcomputers.catalog.add" : "mcvmcomputers.catalog.configure");
+			this.addButton(new ButtonWidget(this.width - 52, y, 46, 13, new LiteralText(addLabel), b -> {
+				if (ClientMod.tabletOS == null) {
+					return;
+				}
+				if (e.configurable != null) {
+					MinecraftClient.getInstance().openScreen(new GuiCardOptions(this, e.configurable, e.preset,
+							s -> addToCart(s, s.getName().getString())));
+					return;
+				}
+				ItemStack s = e.make.get();
+				addToCart(s, e.name);
+				if (s.getItem() == ItemList.ITEM_MOTHERBOARD) {
+					buildEntries(); // the new board becomes what "fits" means
+					rebuildRows();
 				}
 			}));
 			y += ROW;

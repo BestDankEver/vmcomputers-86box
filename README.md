@@ -50,6 +50,9 @@ and compatibility always matches what 86Box will actually run.
    **Parts catalog** opens a searchable shop with every motherboard, CPU and card.
    **Showing: fits my board** narrows it to parts that fit the board in your cart,
    in the PC you last opened, or in your inventory. Pay in iron ingots at the delivery chest.
+   Graphics accelerators (3dfx Voodoo Graphics, Voodoo 2 and friends, the 8514/A, XGA and
+   Display Adapter II) are at the top of the **Video** tab. **Pick...** opens the same
+   settings as 86Box's Configure dialog: memory, SLI, filtering and so on.
 4. Place a PC case and right-click it. **Open case** to install the motherboard, CPU,
    RAM, cards and drives. Right-click a **Hard Drive** item to create its disk first.
 5. Close the case and click **Turn on**. The first time, 86Box and its ROM set (about

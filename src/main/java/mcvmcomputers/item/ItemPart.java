@@ -1,6 +1,7 @@
 package mcvmcomputers.item;
 
 import java.util.List;
+import java.util.Map;
 
 import mcvmcomputers.emu.Catalog;
 import mcvmcomputers.emu.Catalog.Card;
@@ -13,6 +14,7 @@ import mcvmcomputers.emu.HardwareSpec;
 import mcvmcomputers.emu.HardwareSpec.CardPart;
 import mcvmcomputers.emu.HardwareSpec.CpuPart;
 import mcvmcomputers.emu.HardwareSpec.Part;
+import mcvmcomputers.utils.HardwareNbt;
 import net.minecraft.client.item.TooltipContext;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.CompoundTag;
@@ -97,6 +99,21 @@ public class ItemPart extends OrderableItem {
 				}
 			}
 		}
+		if (kind == Kind.CARD && p.contains("Options", 10)) {
+			Map<String, String> opts = HardwareNbt.tagToOptions(p.getCompound("Options"));
+			CardCategory cc = CardCategory.byKey(p.getString("Category"));
+			Card card = cat == null || cc == null ? null : cat.card(cc, p.getString("Id"));
+			if (card != null) {
+				String summary = card.optionSummary(opts);
+				if (!summary.isEmpty()) {
+					tooltip.add(new LiteralText(summary).formatted(Formatting.GRAY));
+				}
+			} else {
+				for (Map.Entry<String, String> e : opts.entrySet()) {
+					tooltip.add(new LiteralText(e.getKey() + " = " + e.getValue()).formatted(Formatting.DARK_GRAY));
+				}
+			}
+		}
 		tooltip.add(new TranslatableText("mcvmcomputers.part.id", p.getString("Id").isEmpty() ? p.getString("Family") : p.getString("Id"))
 				.formatted(Formatting.DARK_GRAY));
 	}
@@ -151,10 +168,21 @@ public class ItemPart extends OrderableItem {
 	}
 
 	public static ItemStack card(Card c) {
+		return card(c, null);
+	}
+
+	/** A card with its 86Box settings (checked against the catalog; anything invalid gets 86Box's default). */
+	public static ItemStack card(Card c, Map<String, String> options) {
 		CompoundTag t = new CompoundTag();
 		t.putString("Category", c.category.key);
 		t.putString("Id", c.id);
-		t.putString("Name", c.name);
+		if (c.options.isEmpty()) {
+			t.putString("Name", c.name);
+		} else {
+			Map<String, String> resolved = c.resolve(options);
+			t.putString("Name", c.displayName(resolved));
+			t.put("Options", HardwareNbt.optionsToTag(resolved));
+		}
 		return make(ItemList.ITEM_CARD, t);
 	}
 
@@ -196,6 +224,9 @@ public class ItemPart extends OrderableItem {
 		t.putString("Category", c.category.key);
 		t.putString("Id", c.id);
 		t.putString("Name", c.name);
+		if (!c.options.isEmpty()) {
+			t.put("Options", HardwareNbt.optionsToTag(c.options));
+		}
 		return make(ItemList.ITEM_CARD, t);
 	}
 
@@ -212,7 +243,8 @@ public class ItemPart extends OrderableItem {
 	public static CardPart toCard(ItemStack s) {
 		CompoundTag t = partTag(s);
 		CardCategory c = t == null ? null : CardCategory.byKey(t.getString("Category"));
-		return c == null ? null : new CardPart(c, t.getString("Id"), t.getString("Name"));
+		return c == null ? null
+				: new CardPart(c, t.getString("Id"), t.getString("Name"), HardwareNbt.tagToOptions(t.getCompound("Options")));
 	}
 
 	public static int ramKb(ItemStack s) {

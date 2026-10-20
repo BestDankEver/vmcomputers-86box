@@ -42,6 +42,9 @@ public final class HardwareNbt {
 			ct.putString("Category", c.category.key);
 			ct.putString("Id", c.id);
 			ct.putString("Name", c.name);
+			if (!c.options.isEmpty()) {
+				ct.put("Options", optionsToTag(c.options));
+			}
 			cards.add(ct);
 		}
 		t.put("Cards", cards);
@@ -85,7 +88,7 @@ public final class HardwareNbt {
 			CompoundTag ct = cards.getCompound(i);
 			CardCategory cat = CardCategory.byKey(ct.getString("Category"));
 			if (cat != null) {
-				s.cards.add(new CardPart(cat, ct.getString("Id"), ct.getString("Name")));
+				s.cards.add(new CardPart(cat, ct.getString("Id"), ct.getString("Name"), tagToOptions(ct.getCompound("Options"))));
 			}
 		}
 		readParts(t.getList("Floppies", TAG_COMPOUND), s.floppies);
@@ -104,6 +107,27 @@ public final class HardwareNbt {
 			s.cdImages.add(ci.getString(i));
 		}
 		return s;
+	}
+
+	/** A card's 86Box settings, name to value. */
+	public static CompoundTag optionsToTag(java.util.Map<String, String> options) {
+		CompoundTag t = new CompoundTag();
+		for (java.util.Map.Entry<String, String> e : options.entrySet()) {
+			t.putString(e.getKey(), e.getValue());
+		}
+		return t;
+	}
+
+	public static java.util.Map<String, String> tagToOptions(CompoundTag t) {
+		java.util.Map<String, String> m = new java.util.LinkedHashMap<>();
+		if (t != null) {
+			for (String k : t.getKeys()) {
+				if (t.contains(k, TAG_STRING)) {
+					m.put(k, t.getString(k));
+				}
+			}
+		}
+		return m;
 	}
 
 	private static CompoundTag partToTag(Part p) {

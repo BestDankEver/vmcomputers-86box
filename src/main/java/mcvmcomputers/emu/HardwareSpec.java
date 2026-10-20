@@ -1,8 +1,11 @@
 package mcvmcomputers.emu;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import mcvmcomputers.emu.Catalog.Card;
 import mcvmcomputers.emu.Catalog.CardCategory;
@@ -51,11 +54,19 @@ public final class HardwareSpec {
 		public final CardCategory category;
 		public final String id;
 		public final String name;
+		/** Settings from the card's 86Box Configure dialog, as 86Box stores them. Empty = 86Box's defaults. */
+		public final Map<String, String> options;
 
 		public CardPart(CardCategory category, String id, String name) {
+			this(category, id, name, null);
+		}
+
+		public CardPart(CardCategory category, String id, String name, Map<String, String> options) {
 			this.category = category;
 			this.id = id;
 			this.name = (name == null || name.isEmpty()) ? id : name;
+			this.options = options == null || options.isEmpty() ? Collections.<String, String>emptyMap()
+					: Collections.unmodifiableMap(new LinkedHashMap<>(options));
 		}
 	}
 
@@ -203,6 +214,7 @@ public final class HardwareSpec {
 					out.add(new Problem(true, "The " + c.name + " doesn't fit this motherboard's slots."));
 				}
 			}
+			checkAccelerators(cat, m, out);
 			if (cardCount(CardCategory.VIDEO) == 0 && (m == null || m.onboardVideo == null)) {
 				out.add(new Problem(false, "No video card: the screen will stay black."));
 			}
@@ -219,6 +231,40 @@ public final class HardwareSpec {
 			out.add(new Problem(true, "Too many drives: hard disks and CD-ROM drives share " + MAX_IDE_DEVICES + " positions."));
 		}
 		return out;
+	}
+
+	/** Add-on cards: one of each kind, and not next to a main card that already is one. */
+	private void checkAccelerators(Catalog cat, Machine m, List<Problem> out) {
+		String main = null;
+		for (CardPart c : cards) {
+			if (c.category == CardCategory.VIDEO) {
+				main = c.id;
+				break;
+			}
+		}
+		if (m != null && m.videoFixed) {
+			main = null; // the board's own video stays the main display
+		}
+		List<String> keys = new ArrayList<>();
+		for (CardPart c : cards) {
+			if (c.category != CardCategory.ACCEL) {
+				continue;
+			}
+			Card card = cat.card(c.category, c.id);
+			if (card == null) {
+				continue;
+			}
+			String key = card.configKey == null ? card.id : card.configKey;
+			if (keys.contains(key)) {
+				out.add(new Problem(true, "Only one " + c.name + " can be installed."));
+			}
+			keys.add(key);
+			if (main != null && card.conflicts.contains(main)) {
+				Card mainCard = cat.card(CardCategory.VIDEO, main);
+				out.add(new Problem(true, "The " + c.name + " can't be used with the "
+						+ (mainCard == null ? main : mainCard.name) + ", which already is one."));
+			}
+		}
 	}
 
 	public static boolean anyBlocking(List<Problem> problems) {
