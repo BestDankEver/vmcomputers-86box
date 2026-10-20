@@ -2,20 +2,17 @@
   "schemaVersion": 1,
   "id": "mcvmcomputers",
   "version": "${version}",
-
-  "name": "VM Computers",
-  "description": "Build computers that actually work using the VirtualBox API!",
+  "name": "VM Computers (86Box)",
+  "description": "Build working retro PCs in Minecraft, emulated by 86Box. Fork of VM Computers by DeltaTwoForce, with VirtualBox replaced by the latest 86Box builds.",
   "authors": [
-    "DeltaTwoForce"
+    "DeltaTwoForce (original mod)",
+    "Dank (86Box edition)"
   ],
   "contact": {
-    "homepage": "https://www.curseforge.com/minecraft/mc-mods/vm-computers",
-    "sources": "https://github.com/Delta2Force/MCVmComputers"
+    "original": "https://github.com/Delta2Force/MCVmComputers"
   },
-
-  "license": "CC0-1.0",
+  "license": "GPL-3.0-or-later",
   "icon": "assets/mcvmcomputers/icon.png",
-
   "environment": "*",
   "entrypoints": {
     "main": [
@@ -28,13 +25,10 @@
   "mixins": [
     "mcvmcomputers.mixins.json"
   ],
-
   "depends": {
-    "fabricloader": ">=0.10.0",
+    "fabricloader": ">=0.11.0",
     "fabric": "*",
-    "minecraft": "1.16.5"
-  },
-  "suggests": {
-    "flamingo": "*"
+    "minecraft": "1.16.5",
+    "java": ">=8"
   }
 }

@@ -254,7 +254,7 @@ public final class VmSession {
 				}
 			}
 
-			client = AutomationClient.connect("127.0.0.1", port, token, 10_000);
+			client = AutomationClient.connect("127.0.0.1", port, token, 30_000);
 			Map<String, Object> status = client.ok("status");
 			if (Json.integer(status, "protocol", 0) != 1) {
 				throw new IOException("Unknown 86Box automation protocol " + Json.integer(status, "protocol", 0));

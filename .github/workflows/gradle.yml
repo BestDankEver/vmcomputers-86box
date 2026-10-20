@@ -1,26 +1,29 @@
-# This workflow will build a Java project with Gradle
-# For more information see: https://help.github.com/actions/language-and-framework-guides/building-and-testing-java-with-gradle
-
-name: Java CI with Gradle
+# Builds the mod jar on every push. Download it from the run's "Artifacts".
+name: Build mod
 
 on:
   push:
-    branches: [ master ]
   pull_request:
-    branches: [ master ]
+  workflow_dispatch:
 
 jobs:
   build:
-
-    runs-on: ubuntu-latest
-
+    runs-on: ubuntu-24.04
     steps:
-    - uses: actions/checkout@v2
-    - name: Set up JDK 1.8
-      uses: actions/setup-java@v1
-      with:
-        java-version: 1.8
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
-    - name: Build with Gradle
-      run: ./gradlew build
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10.2"
+      - name: Build
+        # The jar points at this repository's nightly 86Box releases.
+        run: gradle build --stacktrace -Pnightly_repo=${{ github.repository }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vmcomputers-86box-jar
+          path: |
+            build/libs/*.jar
+            !build/libs/*-sources.jar

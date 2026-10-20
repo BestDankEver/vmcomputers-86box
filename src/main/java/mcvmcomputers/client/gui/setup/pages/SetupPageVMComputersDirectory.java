@@ -40,13 +40,6 @@ public class SetupPageVMComputersDirectory extends SetupPage{
 			if(!ClientMod.vhdDirectory.exists()) {
 				ClientMod.vhdDirectory.mkdir();
 			}
-			try {
-				ClientMod.getVHDNum();
-			} catch (NumberFormatException e) {
-				e.printStackTrace();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
 			this.setupGui.nextPage();
 		}
 	}

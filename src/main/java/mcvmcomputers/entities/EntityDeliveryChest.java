@@ -30,15 +30,15 @@ import net.minecraft.world.World;
 
 public class EntityDeliveryChest extends Entity{
 	private static final TrackedData<Float> TARGET_X =
-			DataTracker.registerData(EntityFlatScreen.class, TrackedDataHandlerRegistry.FLOAT);
+			DataTracker.registerData(EntityDeliveryChest.class, TrackedDataHandlerRegistry.FLOAT);
 	private static final TrackedData<Float> TARGET_Y =
-			DataTracker.registerData(EntityFlatScreen.class, TrackedDataHandlerRegistry.FLOAT);
+			DataTracker.registerData(EntityDeliveryChest.class, TrackedDataHandlerRegistry.FLOAT);
 	private static final TrackedData<Float> TARGET_Z =
-			DataTracker.registerData(EntityFlatScreen.class, TrackedDataHandlerRegistry.FLOAT);
+			DataTracker.registerData(EntityDeliveryChest.class, TrackedDataHandlerRegistry.FLOAT);
 	private static final TrackedData<Boolean> TAKING_OFF =
-			DataTracker.registerData(EntityFlatScreen.class, TrackedDataHandlerRegistry.BOOLEAN);
+			DataTracker.registerData(EntityDeliveryChest.class, TrackedDataHandlerRegistry.BOOLEAN);
 	private static final TrackedData<String> DELIVERY_UUID =
-			DataTracker.registerData(EntityFlatScreen.class, TrackedDataHandlerRegistry.STRING);
+			DataTracker.registerData(EntityDeliveryChest.class, TrackedDataHandlerRegistry.STRING);
 	
 	//Client vars
 	public float renderRot = 90f;
@@ -139,6 +139,9 @@ public class EntityDeliveryChest extends Entity{
 		}
 		if(player.getUuid().toString().equals(getDeliveryUUID())) {
 			TabletOrder to = MainMod.orders.get(UUID.fromString(getDeliveryUUID()));
+			if(to == null) {
+				return ActionResult.FAIL;
+			}
 			if(to.currentStatus == OrderStatus.PAYMENT_CHEST_ARRIVED) {
 				ItemStack is = player.getMainHandStack();
 				
@@ -165,7 +168,7 @@ public class EntityDeliveryChest extends Entity{
 				
 				return flag ? ActionResult.SUCCESS : ActionResult.FAIL;
 			}else if(to.currentStatus == OrderStatus.ORDER_CHEST_ARRIVED) {
-				player.world.spawnEntity(new ItemEntity(player.world, this.getX(), this.getY()+1.5, this.getZ(), ItemPackage.createPackage(Registry.ITEM.getId(to.items.get(0)))));
+				player.world.spawnEntity(new ItemEntity(player.world, this.getX(), this.getY()+1.5, this.getZ(), ItemPackage.createPackage(to.items.get(0))));
 				to.items.remove(0);
 				if(to.items.size() == 0) {
 					to.currentStatus = OrderStatus.ORDER_CHEST_RECEIVED;

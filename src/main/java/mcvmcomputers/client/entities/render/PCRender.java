@@ -38,36 +38,37 @@ public class PCRender extends EntityRenderer<EntityPC>{
 		matrices.multiply(new Quaternion(0f, -90f, 0f, true));
 		matrices.scale(0.55f, 0.55f, 0.55f);
 		matrices.translate(0.06f, 0.28f, -0.29f);
-		if(entity.getMotherboardInstalled()) {
+		mcvmcomputers.emu.HardwareSpec hw = entity.getHardware();
+		if(hw.motherboard != null) {
 			MinecraftClient.getInstance().getItemRenderer().renderItem(new ItemStack(ItemList.ITEM_MOTHERBOARD), Mode.NONE, light, OverlayTexture.DEFAULT_UV, matrices, vertexConsumers);
 		}
-		if(entity.getGpuInstalled()) {
+		if(!hw.cards.isEmpty()) {
 			matrices.push();
 			matrices.translate(0.24, 0.07f, -0.28f);
-			MinecraftClient.getInstance().getItemRenderer().renderItem(new ItemStack(ItemList.ITEM_GPU), Mode.NONE, light, OverlayTexture.DEFAULT_UV, matrices, vertexConsumers);
+			MinecraftClient.getInstance().getItemRenderer().renderItem(new ItemStack(ItemList.ITEM_CARD), Mode.NONE, light, OverlayTexture.DEFAULT_UV, matrices, vertexConsumers);
 			matrices.pop();
 		}
-		if(entity.getCpuDividedBy() > 0) {
+		if(hw.cpu != null) {
 			matrices.push();
 			matrices.translate(0.06, 0.12f, 0.06f);
-			MinecraftClient.getInstance().getItemRenderer().renderItem(new ItemStack(ItemList.ITEM_CPU2), Mode.NONE, light, OverlayTexture.DEFAULT_UV, matrices, vertexConsumers);
+			MinecraftClient.getInstance().getItemRenderer().renderItem(new ItemStack(ItemList.ITEM_CPU), Mode.NONE, light, OverlayTexture.DEFAULT_UV, matrices, vertexConsumers);
 			matrices.pop();
 		}
-		if(entity.getGigsOfRamInSlot0() > 0) {
+		if(hw.ramKb.size() > 0) {
 			matrices.push();
 			matrices.multiply(new Quaternion(0f, 90f, 0f, true));
 			matrices.translate(-0.22f, 0.1f, -0.285f);
-			MinecraftClient.getInstance().getItemRenderer().renderItem(new ItemStack(ItemList.ITEM_RAM1G), Mode.NONE, light, OverlayTexture.DEFAULT_UV, matrices, vertexConsumers);
+			MinecraftClient.getInstance().getItemRenderer().renderItem(new ItemStack(ItemList.ITEM_RAM), Mode.NONE, light, OverlayTexture.DEFAULT_UV, matrices, vertexConsumers);
 			matrices.pop();
 		}
-		if(entity.getGigsOfRamInSlot1() > 0) {
+		if(hw.ramKb.size() > 1) {
 			matrices.push();
 			matrices.multiply(new Quaternion(0f, 90f, 0f, true));
 			matrices.translate(-0.22f, 0.1f, -0.404f);
-			MinecraftClient.getInstance().getItemRenderer().renderItem(new ItemStack(ItemList.ITEM_RAM1G), Mode.NONE, light, OverlayTexture.DEFAULT_UV, matrices, vertexConsumers);
+			MinecraftClient.getInstance().getItemRenderer().renderItem(new ItemStack(ItemList.ITEM_RAM), Mode.NONE, light, OverlayTexture.DEFAULT_UV, matrices, vertexConsumers);
 			matrices.pop();
 		}
-		if(!entity.getHardDriveFileName().isEmpty()) {
+		if(!hw.hardDisks.isEmpty()) {
 			matrices.push();
 			matrices.multiply(new Quaternion(90, 0, 0, true));
 			matrices.multiply(new Quaternion(0, 90, 0, true));

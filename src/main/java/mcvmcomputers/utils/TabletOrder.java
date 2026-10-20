@@ -3,21 +3,22 @@ package mcvmcomputers.utils;
 import java.util.List;
 import java.util.UUID;
 
-import mcvmcomputers.item.OrderableItem;
+import net.minecraft.item.ItemStack;
 
 public class TabletOrder {
-	public List<OrderableItem> items;
+	/** Ordered items, one stack per item, with NBT (which CPU, which card...). */
+	public List<ItemStack> items;
 	public OrderStatus currentStatus = OrderStatus.PAYMENT_CHEST_ARRIVAL_SOON;
 	public int price;
 	public boolean entitySpawned;
 	public String orderUUID;
 	public float tickCount;
-	
+
 	public TabletOrder() {
 		orderUUID = UUID.randomUUID().toString();
 	}
-	
-	public enum OrderStatus{
+
+	public enum OrderStatus {
 		PAYMENT_CHEST_ARRIVAL_SOON,
 		PAYMENT_CHEST_ARRIVED,
 		PAYMENT_CHEST_RECEIVING,

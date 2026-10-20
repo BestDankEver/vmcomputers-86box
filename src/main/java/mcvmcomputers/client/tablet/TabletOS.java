@@ -29,7 +29,8 @@ import mcvmcomputers.sound.SoundList;
 import mcvmcomputers.sound.TabletSoundInstance;
 import mcvmcomputers.utils.MVCUtils;
 import mcvmcomputers.utils.TabletOrder.OrderStatus;
-import net.fabricmc.fabric.api.network.ClientSidePacketRegistry;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import mcvmcomputers.client.gui.GuiPartsCatalog;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.sound.PositionedSoundInstance;
 import net.minecraft.client.sound.SoundInstance;
@@ -62,9 +63,9 @@ public class TabletOS {
 	private SoundInstance shopIntroSound;
 	private SoundInstance shopMusicSound;
 	private SoundInstance shopOutroSound;
-	private ArrayList<OrderableItem> shoppingCart;
-	private static final List<OrderableItem> PC_PARTS = Arrays.asList(ItemList.PC_CASE, ItemList.PC_CASE_SIDEPANEL, ItemList.ITEM_MOTHERBOARD, ItemList.ITEM_MOTHERBOARD64, ItemList.ITEM_RAM64M, ItemList.ITEM_RAM128M, ItemList.ITEM_RAM256M, ItemList.ITEM_RAM512M, ItemList.ITEM_RAM1G, ItemList.ITEM_RAM2G, ItemList.ITEM_RAM4G, ItemList.ITEM_CPU2, ItemList.ITEM_CPU4, ItemList.ITEM_CPU6, ItemList.ITEM_GPU, ItemList.ITEM_HARDDRIVE);
-	private static final List<OrderableItem> PERIPHERALS = Arrays.asList(ItemList.ITEM_KEYBOARD, ItemList.ITEM_MOUSE, ItemList.ITEM_CRTSCREEN, ItemList.ITEM_FLATSCREEN, ItemList.ITEM_WALLTV);
+	/** Items in the cart, with NBT. Written from the catalog screen, read by the tablet thread. */
+	private final List<ItemStack> shoppingCart = new java.util.concurrent.CopyOnWriteArrayList<>();
+	private static final List<OrderableItem> PERIPHERALS = ItemList.STORE_PERIPHERALS;
 	private BufferedImage lastShopImage;
 	
 	//Delivery variables
@@ -204,7 +205,7 @@ public class TabletOS {
 			if(totalTimeRadar > 2) {
 				mcc.getSoundManager().stop(shopIntroSound);
 				lastRadarImage = null;
-				shoppingCart = new ArrayList<OrderableItem>();
+				shoppingCart.clear();
 				tabletState = State.SHOP;
 				shopState = ShopState.MENU;
 				shopGradientEndValue = 1f;
@@ -245,7 +246,7 @@ public class TabletOS {
 			g2d.drawString("VMcorp Store", 4-shopPx, 20-shopPy);
 			
 			g2d.setFont(font.deriveFont(46f));
-			g2d.drawString("Parts", 24-shopPx, 60-shopPy);
+			g2d.drawString("Parts catalog", 24-shopPx, 60-shopPy);
 			g2d.drawString("Peripherals", 24-shopPx, 90-shopPy);
 			g2d.drawString("Shopping cart", 24-shopPx, 120-shopPy);
 			
@@ -262,60 +263,16 @@ public class TabletOS {
 			g2d.drawString("System ZA-83 and the corporations residing in", 4-shopPx, 240-shopPy);
 			g2d.drawString("it including VMcorp if requested.", 4-shopPx, 250-shopPy);
 			
-			if(shopState == ShopState.PC_PARTS || renderExtraShopState == ShopState.PC_PARTS) {
-				int offY = 20;
-				for(OrderableItem oi : PC_PARTS) {
-					int offX = 0;
-					g2d.setFont(font.deriveFont(23f)); offY += 20;
-					g2d.drawString(oi.getName().getString(), (270+offX)-shopPx, offY-shopPy);
-					g2d.setFont(font.deriveFont(16f)); offY += 10; offX = 10;
-					int inCart = 0;
-					for(OrderableItem io : shoppingCart) {
-						if(io.equals(oi)) {
-							inCart++;
-						}
-					}
-					if(inCart > 0) {
-						g2d.drawString(oi.getPrice() + " Iron Ingots | " + inCart + " in cart", (270+offX)-shopPx, offY-shopPy);
-					}else {
-						g2d.drawString(oi.getPrice() + " Iron Ingots", (270+offX)-shopPx, offY-shopPy);
-					}
-				}
-				g2d.setFont(font.deriveFont(32f));
-				g2d.drawString("PC parts", 260-shopPx, 20-shopPy);
-				g2d.setFont(font.deriveFont(23f));
-				int ry = (40+(shopExtraIndex*30));
-				float targetShopPy = shopPy;
-				if(ry + 60 > shopPy+256) {
-					targetShopPy = ry - 186;
-				}
-				if(ry-50 < shopPy) {
-					targetShopPy = ry - 60;
-				}
-				if(targetShopPy < 0) {
-					targetShopPy = 0;
-				}else if(targetShopPy > offY - 248) {
-					targetShopPy = offY - 248;
-				}
-				if(shopState == ShopState.PC_PARTS) {
-					shopPx = MVCUtils.lerp(shopPx, 256, deltaTime*5f);
-					shopPy = MVCUtils.lerp(shopPy, targetShopPy, deltaTime*5f);
-				}
-				g2d.drawString(">", 260-shopPx, ry-shopPy);
-				g2d.setFont(font.deriveFont(16f));
-				g2d.drawString("Navigate using arrows,", 390-shopPx, 15-shopPy);
-				g2d.drawString("Select using enter,", 409-shopPx, 25-shopPy);
-				g2d.drawString("Exit using left", 432-shopPx, 35-shopPy);
-			}else if(shopState == ShopState.SHOPPING_CART || renderExtraShopState == ShopState.SHOPPING_CART) {
+			if(shopState == ShopState.SHOPPING_CART || renderExtraShopState == ShopState.SHOPPING_CART) {
 				int offY = 30;
 				int sum = 0;
-				for(OrderableItem oi : shoppingCart) {
+				for(ItemStack oi : shoppingCart) {
 					int offX = 0;
 					g2d.setFont(font.deriveFont(23f)); offY += 20;
-					g2d.drawString(oi.getName().getString(), (270+offX)-shopPx, offY-shopPy);
+					g2d.drawString(shorten(oi.getName().getString()), (270+offX)-shopPx, offY-shopPy);
 					g2d.setFont(font.deriveFont(16f)); offY += 10; offX = 10;
-					g2d.drawString(oi.getPrice() + " Iron Ingots | enter to remove", (270+offX)-shopPx, offY-shopPy);
-					sum += oi.getPrice();
+					g2d.drawString(priceOf(oi) + " Iron Ingots | enter to remove", (270+offX)-shopPx, offY-shopPy);
+					sum += priceOf(oi);
 				}
 				if(shoppingCart.size() == 0) {
 					g2d.setFont(font.deriveFont(23f));
@@ -368,8 +325,8 @@ public class TabletOS {
 					g2d.drawString(oi.getName().getString(), (270+offX)-shopPx, offY-shopPy);
 					g2d.setFont(font.deriveFont(16f)); offY += 10; offX = 10;
 					int inCart = 0;
-					for(OrderableItem io : shoppingCart) {
-						if(io.equals(oi)) {
+					for(ItemStack io : shoppingCart) {
+						if(io.getItem() == oi) {
 							inCart++;
 						}
 					}
@@ -592,6 +549,11 @@ public class TabletOS {
 		
 		if(tabletOn) {
 			orderingTabletModel.setButtons(pressed(GLFW.GLFW_KEY_UP), pressed(GLFW.GLFW_KEY_DOWN), pressed(GLFW.GLFW_KEY_LEFT), pressed(GLFW.GLFW_KEY_RIGHT), pressed(GLFW.GLFW_KEY_ENTER), mcc.getTickDelta());
+			if(mcc.currentScreen != null) {
+				// Keys belong to the open screen (e.g. the catalog's search box).
+				arrowDownPressed = arrowUpPressed = arrowLeftPressed = arrowRightPressed = true;
+				return;
+			}
 			if(tabletState == State.LOOKING_FOR_SATELLITE && satelliteVisible) {
 				if(pressed(GLFW.GLFW_KEY_ENTER)) {
 					totalTimeRadar = 0;
@@ -603,10 +565,7 @@ public class TabletOS {
 				if(pressed(GLFW.GLFW_KEY_LEFT)) {
 					if(!arrowLeftPressed) {
 						arrowLeftPressed = true;
-						if(shopState == ShopState.PC_PARTS) {
-							shopState = ShopState.MENU;
-							renderExtraShopState = ShopState.PC_PARTS;
-						}else if(shopState == ShopState.SHOPPING_CART) {
+						if(shopState == ShopState.SHOPPING_CART) {
 							shopState = ShopState.MENU;
 							renderExtraShopState = ShopState.SHOPPING_CART;
 						}else if(shopState == ShopState.PERIPHERALS) {
@@ -627,11 +586,6 @@ public class TabletOS {
 							shopIndex += 1;
 							if(shopIndex > 2) {
 								shopIndex = 0;
-							}
-						}else if(shopState == ShopState.PC_PARTS) {
-							shopExtraIndex += 1;
-							if(shopExtraIndex >= PC_PARTS.size()) {
-								shopExtraIndex = 0;
 							}
 						}else if(shopState == ShopState.SHOPPING_CART) {
 							shopExtraIndex += 1;
@@ -659,11 +613,6 @@ public class TabletOS {
 							if(shopIndex < 0) {
 								shopIndex = 2;
 							}
-						}else if(shopState == ShopState.PC_PARTS) {
-							shopExtraIndex -= 1;
-							if(shopExtraIndex < 0) {
-								shopExtraIndex = PC_PARTS.size()-1;
-							}
 						}else if(shopState == ShopState.SHOPPING_CART) {
 							shopExtraIndex -= 1;
 							if(shopExtraIndex < 0) {
@@ -688,8 +637,7 @@ public class TabletOS {
 						if(shopState == ShopState.MENU) {
 							shopExtraIndex = 0; 
 							if(shopIndex == 0) {
-								shopState = ShopState.PC_PARTS;
-								renderExtraShopState = ShopState.PC_PARTS;
+								mcc.openScreen(new GuiPartsCatalog());
 							}else if(shopIndex == 1) {
 								shopState = ShopState.PERIPHERALS;
 								renderExtraShopState = ShopState.PERIPHERALS;
@@ -697,10 +645,8 @@ public class TabletOS {
 								shopState = ShopState.SHOPPING_CART;
 								renderExtraShopState = ShopState.SHOPPING_CART;
 							}
-						}else if(shopState == ShopState.PC_PARTS) {
-							shoppingCart.add(PC_PARTS.get(shopExtraIndex));
 						}else if(shopState == ShopState.PERIPHERALS) {
-							shoppingCart.add(PERIPHERALS.get(shopExtraIndex));
+							shoppingCart.add(new ItemStack(PERIPHERALS.get(shopExtraIndex)));
 						}else if(shopState == ShopState.SHOPPING_CART) {
 							if(shopExtraIndex != shoppingCart.size()){
 								shoppingCart.remove(shopExtraIndex);
@@ -708,10 +654,10 @@ public class TabletOS {
 								if(shoppingCart.size() > 0) {
 									PacketByteBuf p = new PacketByteBuf(Unpooled.buffer());
 									p.writeInt(shoppingCart.size());
-									for(OrderableItem i : shoppingCart) {
-										p.writeItemStack(new ItemStack(i));
+									for(ItemStack i : shoppingCart) {
+										p.writeItemStack(i);
 									}
-									ClientSidePacketRegistry.INSTANCE.sendToServer(PacketList.C2S_ORDER, p);
+									ClientPlayNetworking.send(PacketList.C2S_ORDER, p);
 									
 									tabletState = State.SHOP_OUTRO;
 									totalTimeRadar = 0;
@@ -729,6 +675,30 @@ public class TabletOS {
 		}
 	}
 	
+	public List<ItemStack> cart() {
+		return shoppingCart;
+	}
+
+	public void addToCart(ItemStack s) {
+		shoppingCart.add(s);
+	}
+
+	public int cartPrice() {
+		int sum = 0;
+		for (ItemStack s : shoppingCart) {
+			sum += priceOf(s);
+		}
+		return sum;
+	}
+
+	private static int priceOf(ItemStack s) {
+		return s.getItem() instanceof OrderableItem ? ((OrderableItem) s.getItem()).getPrice(s) : 0;
+	}
+
+	private static String shorten(String s) {
+		return s.length() > 34 ? s.substring(0, 33) + "..." : s;
+	}
+
 	public void generateTexture() {
 		if(!tabletOn) {
 			orderingTabletModel.rotateButtons(2F, deltaTime);
@@ -760,7 +730,7 @@ public class TabletOS {
 	}
 	
 	public enum ShopState{
-		MENU, PC_PARTS, PERIPHERALS, SHOPPING_CART
+		MENU, PERIPHERALS, SHOPPING_CART
 	}
 	
 	public enum State{

@@ -16,47 +16,65 @@ import net.minecraft.util.TypedActionResult;
 import net.minecraft.util.registry.Registry;
 import net.minecraft.world.World;
 
-public class ItemPackage extends Item{
-
+/** A delivered package; right-click to unwrap the item inside (with its NBT, e.g. which CPU it is). */
+public class ItemPackage extends Item {
 	public ItemPackage(Settings settings) {
 		super(settings);
 	}
-	
+
+	@Override
+	public boolean shouldSyncTagToClient() {
+		return true;
+	}
+
+	private static ItemStack contents(ItemStack pkg) {
+		CompoundTag t = pkg.getTag();
+		if (t == null || !t.contains("packaged_item")) {
+			return ItemStack.EMPTY;
+		}
+		Item item = Registry.ITEM.get(new Identifier(t.getString("packaged_item")));
+		ItemStack s = new ItemStack(item);
+		if (t.contains("packaged_tag", 10)) {
+			s.setTag(t.getCompound("packaged_tag").copy());
+		}
+		return s;
+	}
+
 	@Override
 	public TypedActionResult<ItemStack> use(World world, PlayerEntity user, Hand hand) {
-		if(!world.isClient){
-			ItemStack is = user.getStackInHand(hand);
-			if(is.getTag() != null) {
-				if(is.getTag().contains("packaged_item")) {
-					is.decrement(1);
-					user.giveItemStack(new ItemStack(Registry.ITEM.get(new Identifier(is.getTag().getString("packaged_item")))));
-				}
+		ItemStack is = user.getStackInHand(hand);
+		if (!world.isClient) {
+			ItemStack inside = contents(is);
+			if (!inside.isEmpty()) {
+				is.decrement(1);
+				user.inventory.offerOrDrop(world, inside);
 			}
 		}
-		return super.use(world, user, hand);
+		return TypedActionResult.success(is, world.isClient);
 	}
-	
+
 	@Override
 	public Text getName(ItemStack stack) {
-		if(stack.getTag() != null) {
-			if(stack.getTag().contains("packaged_item")) {
-				return new TranslatableText("mcvmcomputers.packaged").formatted(Formatting.GRAY).append(new TranslatableText(Registry.ITEM.get(new Identifier(stack.getTag().getString("packaged_item"))).getTranslationKey()).formatted(Formatting.GREEN));
-			}
+		ItemStack inside = contents(stack);
+		if (!inside.isEmpty()) {
+			return new TranslatableText("mcvmcomputers.packaged").formatted(Formatting.GRAY)
+					.append(inside.getName().shallowCopy().formatted(Formatting.GREEN));
 		}
 		return new TranslatableText("mcvmcomputers.invalid_package").formatted(Formatting.RED);
 	}
-	
+
 	@Override
 	public void appendTooltip(ItemStack stack, World world, List<Text> tooltip, TooltipContext context) {
 		tooltip.add(new TranslatableText("mcvmcomputers.open_with_right_click").formatted(Formatting.GRAY));
 	}
-	
-	public static ItemStack createPackage(Identifier id) {
+
+	public static ItemStack createPackage(ItemStack contents) {
 		ItemStack is = new ItemStack(ItemList.ITEM_PACKAGE);
 		CompoundTag ct = is.getOrCreateTag();
-		ct.putString("packaged_item", id.toString());
-		is.setTag(ct);
+		ct.putString("packaged_item", Registry.ITEM.getId(contents.getItem()).toString());
+		if (contents.getTag() != null) {
+			ct.put("packaged_tag", contents.getTag().copy());
+		}
 		return is;
 	}
-
 }
