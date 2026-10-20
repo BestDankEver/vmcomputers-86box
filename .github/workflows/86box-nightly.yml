@@ -195,6 +195,11 @@ jobs:
           cd dl
           emu_version=$(jq -r .emulator_version catalog.json)
           tag="86box-$(date -u +%Y%m%d)-$(echo ${{ needs.check.outputs.emu_sha }} | cut -c1-8)"
+          # A forced rebuild of the same 86Box on the same day gets -2, -3, ...
+          base_tag=$tag; n=1
+          while gh release view "$tag" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; do
+            n=$((n + 1)); tag="$base_tag-$n"
+          done
           echo "TAG=$tag" >> "$GITHUB_ENV"
           base="https://github.com/$GITHUB_REPOSITORY/releases/download/$tag"
           jq -n \
