@@ -25,6 +25,12 @@ public class GuiFocus extends Screen {
 	private final MinecraftClient minecraft = MinecraftClient.getInstance();
 	private double lastX = Double.NaN;
 	private double lastY = Double.NaN;
+	/**
+	 * Buttons already down when focus started (the right-click on the monitor
+	 * that opened this screen). They're not sent until released, which is
+	 * what made clicks show up as right-clicks in the original mod.
+	 */
+	private int heldAtStart = -1;
 
 	public GuiFocus() {
 		super(new TranslatableText("Focus"));
@@ -49,6 +55,8 @@ public class GuiFocus extends Screen {
 		}
 		GLFW.glfwSetInputMode(minecraft.getWindow().getHandle(), GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_DISABLED);
 		lastX = Double.NaN;
+		lastY = Double.NaN;
+		heldAtStart = -1;
 	}
 
 	@Override
@@ -65,6 +73,11 @@ public class GuiFocus extends Screen {
 		int buttons = (GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_LEFT) == GLFW.GLFW_PRESS ? 1 : 0)
 				| (GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_RIGHT) == GLFW.GLFW_PRESS ? 2 : 0)
 				| (GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_MIDDLE) == GLFW.GLFW_PRESS ? 4 : 0);
+		if (heldAtStart < 0) {
+			heldAtStart = buttons;
+		}
+		heldAtStart &= buttons; // forget a button once it's released
+		buttons &= ~heldAtStart;
 		if (vm != null) {
 			int dx = Double.isNaN(lastX) ? 0 : (int) Math.round(x - lastX);
 			int dy = Double.isNaN(lastY) ? 0 : (int) Math.round(y - lastY);

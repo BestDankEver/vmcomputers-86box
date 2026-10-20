@@ -149,7 +149,8 @@ jobs:
             qtbase5-dev qtbase5-private-dev qttools5-dev qttools5-dev-tools libqt5opengl5-dev \
             extra-cmake-modules libwayland-dev wayland-protocols libxkbcommon-dev libxi-dev \
             libsdl2-dev libopenal-dev libslirp-dev librtmidi-dev libsndfile1-dev libevdev-dev \
-            libserialport-dev libfreetype-dev libpng-dev zlib1g-dev libzstd-dev
+            libserialport-dev libfreetype-dev libpng-dev zlib1g-dev libzstd-dev \
+            libxxhash-dev libfaudio-dev libvdeplug-dev libpcap-dev libflac-dev
       - name: Build 86Box objects
         working-directory: 86Box
         run: |

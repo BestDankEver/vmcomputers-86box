@@ -62,6 +62,25 @@ public class ItemHarddrive extends OrderableItem {
 		return t == null ? 0 : t.getInt("SizeMb");
 	}
 
+	/** The anvil name as text JSON, or "" if the drive wasn't renamed. */
+	public static String customNameOf(ItemStack stack) {
+		CompoundTag t = stack.getTag();
+		if (t != null && t.contains("display", 10)) {
+			return t.getCompound("display").getString("Name");
+		}
+		return "";
+	}
+
+	public static ItemStack createHardDrive(String fileName, int sizeMb, String customName) {
+		ItemStack is = createHardDrive(fileName, sizeMb);
+		if (customName != null && !customName.isEmpty()) {
+			CompoundTag display = new CompoundTag();
+			display.putString("Name", customName);
+			is.getOrCreateTag().put("display", display);
+		}
+		return is;
+	}
+
 	public static ItemStack createHardDrive(String fileName, int sizeMb) {
 		ItemStack is = new ItemStack(ItemList.ITEM_HARDDRIVE);
 		CompoundTag ct = is.getOrCreateTag();

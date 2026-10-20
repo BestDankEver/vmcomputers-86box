@@ -1,84 +1,144 @@
-> [!WARNING]
-> This repository is currently abandoned as we are working on a rewrite. Due to us starting the rewrite
-> overlapping with a bunch of big changes in our lives, we currently can't guarantee any release date.
-> All important updates will be on [Discord](https://discord.gg/gNgaxZa4yX).
+# VM Computers (86Box edition)
 
-<p align="center"><img src="https://raw.githubusercontent.com/y2k04/MCVmComputers/master/src/main/resources/assets/mcvmcomputers/icon.png" height="320"></p>
+Build real, working retro PCs in Minecraft. This is a fork of
+[VM Computers](https://github.com/Delta2Force/MCVmComputers) by DeltaTwoForce,
+with VirtualBox replaced by [86Box](https://86box.net), an emulator of IBM PCs
+and compatibles from 1981 to the early 2000s.
 
-<a href="https://discord.gg/gNgaxZa4yX">Join the MCVmComputers Discord Server!</a>
+- **Minecraft 1.16.5, Fabric**, same as the original mod.
+- **Real hardware.** Hundreds of real motherboards, CPUs, video, sound and network
+  cards, disk controllers, floppy and CD-ROM drives, all taken from 86Box itself.
+  Parts only go where they'd really fit: a Pentium won't go in a 486 board and a PCI
+  card won't go in an ISA-only machine.
+- **Always the newest 86Box.** The mod downloads the newest 86Box development build
+  by itself. No mod update is needed when 86Box updates.
+- **Multiplayer.** Players near your PC see its screen without having 86Box; they
+  only need the mod. Only the owner can type and click on it.
 
-<details>
-	<summary>Donate to the original creator (<a href="https://github.com/Delta2Force">Delta2Force</a>)<br><sub><i>Note: Only accepts Bitcoin and BitcoinCash</i></sub></summary>
-<i>BTC:</i> <code>3GubEkHV69gCkjWhRgRWYqWqyjcWW3gxFF</code><br><i>BCH:</i> <code>bitcoincash:qq6jttzlvgj68lvecnh75pt3znezj4vx6sysfvj3j5</code>
-</details><hr>
+## How it fits together
 
-<h3>Dependencies</h3>
-<ul>
-	<li>Minecraft 1.16.5</li>
-	<ul>
-		<li><a href="https://fabricmc.net/use">Fabric</a></li>
-		<li><a href="https://modrinth.com/mod/fabric-api/version/0.42.0+1.16">Fabric API <i>(0.42.0+1.16)</i></a></li>
-	</ul>
-	<li><a href="https://www.virtualbox.org/wiki/Download_Old_Builds_6_1">VirtualBox 6.1</a></li>
-</ul>
+```
+ 86Box master ──nightly GitHub Action──► release: 86Box-Windows-x64.zip
+ (unmodified, built with                          catalog.json  (parts + compatibility)
+  -D AUTOMATION=ON)                               manifest.json (what's newest)
+                                                          │
+ the mod ──reads releases/latest/download/manifest.json──┘
+   • catalog.json     every game start, for the parts shop
+   • 86Box + ROM set  the first time a PC is switched on, then kept up to date
+   • runs 86Box hidden and talks to it over its automation socket
+     (screen, keyboard, mouse, media, reset, power)
+```
 
-<h2>How to use</h2>
+**Why a separate build of 86Box?** 86Box has a built-in automation socket that lets
+a program control a running machine, but it's a compile-time option that the
+official builds leave off. The workflow in `.github/workflows/86box-nightly.yml`
+builds the newest 86Box source every night, unchanged, with that one option on.
+If the 86Box team ever turns it on in their own builds, the mod can switch to
+those instead.
 
-<h3>Ordering</h3>
-<ol>
-	<li>Craft an ordering tablet (as seen below)<br><img src="https://i.imgur.com/GtyPntY.png"></li>
-	<li>Wait until it detects a satellite (they appear quite often)<br><img src="https://i.imgur.com/hWRK8wb.png"></li>
-	<li>The rest is (hopefully) self-explanatory</li>
-</ol>
-<hr>
+**Why a parts catalog?** `tools/catalog` is a small program linked against the same
+86Box build. It asks 86Box's own code which machines exist, which CPUs each board
+takes, how much RAM it supports, and which cards fit which slots, and writes the
+answers to `catalog.json`. New hardware in 86Box shows up in the shop by itself,
+and compatibility always matches what 86Box will actually run.
 
-<h3>Creating a Hard Drive / Importing an ISO disk image</h3>
-<p>Virtual Hard Drives are created by pressing the use button (right-click) while holding an hard drive in your hand. It doesn't matter if it has been assigned to a disk image or not as it will always open the menu. You can either use an existing hard drive (located in <code>.minecraft/vm_computers/vhds</code>) or create a new one.</p>
-<p>ISO images are CDs / DVDs but as files. They are stored at <code>.minecraft/vm_computers/isos</code>. Once you place them in the folder, you can select them in the PC case menu.</p>
-<hr>
+## Playing
 
-<h3>Building the computer</h3>
-<p>You will need the following items (which can be bought from the Ordering Tablet):</p>
-<ul>
-	<li>PC Case,</li>
-	<li>Motherboard,</li>
-	<li>RAM,</li>
-	<li>GPU, and</li>
-	<li>Monitor</li>
-</ul>
-<sub>Note: The keyboard and mouse are purely decorative (currently...) and you can start the VM without a hard drive or ISO inserted.</sub><br><br>
-<p>To insert a hard drive, you will need to create one by right-clicking with a hard drive in your hand.<br>It doesn't matter if it is already assigned to a disk image or not.</p>
-<ol>
-	<li>Place down the case<br><img src="https://i.imgur.com/8Wgqtcb.png"></li>
-	<li>Press the use button (right-click) on the case<br><img src="https://i.imgur.com/OPRi9xa.png"></li>
-	<li>(Optional) Select an ISO image from the list</li>
-	<li>Open the case<br><img src="https://i.imgur.com/sXYTRuc.png"><br><sub>Note: The buttons will be disabled if you do not have the item in your inventory.</sub></li>
-	<li>The rest (hopefully) is self-explanatory</li>
-</ol>
-<hr>
+1. Install Fabric Loader and Fabric API for Minecraft 1.16.5, then put the mod jar in `mods`.
+2. Start the game and finish the short setup (folder and "leave the VM" keys).
+3. Craft an **Ordering Tablet**. When the satellite passes over, open the store.
+   **Parts catalog** opens a searchable shop with every motherboard, CPU and card.
+   **Showing: fits my board** narrows it to parts that fit the board in your cart,
+   in the PC you last opened, or in your inventory. Pay in iron ingots at the delivery chest.
+4. Place a PC case and right-click it. **Open case** to install the motherboard, CPU,
+   RAM, cards and drives. Right-click a **Hard Drive** item to create its disk first.
+5. Close the case and click **Turn on**. The first time, 86Box and its ROM set (about
+   150 MB) download automatically.
+6. Right-click a monitor to use the PC. The default key combo to leave is
+   **Ctrl + Backspace**.
 
-<h3>Using the computer</h3>
-<p>To turn on the computer, press the Power On button in the PC case menu. To interact with the computer, press the use button (right-click) on the monitor.<br><sub>Note: Pressing Alt+F4 will close the game, not the window you are on in the virtual machine.</sub><br><br>To stop interacting with the computer, press the keys mentioned in the top-right corner of the screen when interacting with the monitor.</p>
-<hr>
+Put CD images (`.iso`, `.cue`, `.chd`...) in `vm_computers/isos` and floppy images
+(`.img`, `.ima`, `.86f`...) in `vm_computers/floppies`. Insert them from the PC screen,
+even while it's running. Hard disks live in `vm_computers/vhds`, and each PC's BIOS
+settings live in `vm_computers/machines/<pc id>`.
 
-<h2>Contributing</h2>
-<p>If you'd like to contribute to this project, please fork the master branch, make your changes and create a pull request to have the changes reviewed. If you plan to contribute larger changes, please create a issue to discuss the major changes that you were planning to make.</p>
-<p>I don't like rules, but to keep consistency and readability of the code please follow these guidelines:</p>
-<ol>
-	<li>Use lambda expressions when appropriate</li>
-	<ul>
-		<li>You'll find that it is faster to write <code>() -> {}</code>, just saying :)</li>
-	</ul>
-	<li>Try to follow the code style of the project</li>
-	<ul>
-		<li>Makes everyone's life so much easier when it comes to making changes and understanding the code</li>
-	</ul>
-	<li>Commit messages should describe the change well without being too short</li>
-	<ul>
-		<li>Where it says <i>'Update [insert file name here]'</i> should be replaced with a short overview of what was changed. Use the optional extended description to explain the specific changes that were made.</li>
-	</ul>
-	<li>When making a pull request, make sure that you have made all of the changes you have wanted to before posting the pull request.</li>
-	<ul>
-		<li>It gets messy when you create a pull request and continue to make changes after the fact.</li>
-	</ul>
-</ol>
+Settings are in `vm_computers/setup.json`:
+
+| Setting | Default | What it does |
+|---|---|---|
+| `frameIntervalMs` | 50 | How often your screen refreshes from 86Box (50 = 20 fps). |
+| `streamFps` | 5 | Frames per second sent to players watching your screen. |
+| `romUpdateDays` | 7 | How often the ~100 MB ROM set is refreshed. A PC that needs newer ROMs triggers an update by itself. |
+| `manifestUrl` | this repository | Where to look for nightly 86Box builds. |
+| `custom86BoxExe`, `customRomDirectory` | empty | Use your own 86Box build and ROMs instead (it must be built with `-D AUTOMATION=ON`). |
+
+## Setting up the repository (one time)
+
+1. Put this repository on GitHub. In GitHub Desktop, use *File → Add local repository*,
+   then *Publish repository*.
+2. On GitHub, open the **Actions** tab and enable workflows if asked.
+3. Run **86Box nightly** once by hand (*Run workflow*, tick *force*). It takes about
+   30–45 minutes and publishes the first release. After that it runs every night and
+   only builds when 86Box or its ROM set changed.
+4. **Build mod** runs on every push. The mod jar is in that run's *Artifacts*. The jar
+   automatically points at this repository's releases.
+
+GitHub pauses scheduled workflows in repositories with no activity for 60 days. If
+nightlies stop, re-enable the workflow on the Actions tab.
+
+## Building locally
+
+Needs Java 17 or newer to run Gradle (the mod itself is compiled for Java 8):
+
+```
+./gradlew build -Pnightly_repo=YOUR_GITHUB_NAME/YOUR_REPO
+```
+
+## What changed from the original
+
+**Replaced:** VirtualBox and its Java bindings, vboxwebsrv, and the VirtualBox setup
+pages. The old "32/64-bit motherboard", "1/N host CPU" and fixed RAM items are gone.
+
+**Fixed along the way** (several are open issues on the original repository):
+- Clicks registering as right-clicks (#142, #190, #284): the right-click that focused
+  the monitor was forwarded to the guest.
+- `NoSuchMethodError: DoubleBuffer.clear()` on Java 8 (#208): the mod is now compiled with `--release 8`.
+- Crash in the PC screen, "Color parameter outside of expected range" (#198).
+- "Duplicate id value" server crash (#39): the delivery chest registered its data
+  under the flat screen's entity class.
+- Off-hand placement crash (#68).
+- Screens flickering for other players (#121), and screen textures being re-created
+  (and leaked) every frame.
+- Renamed hard drives losing their name after going in and out of a PC (#50).
+- The tablet's render thread spinning a CPU core at 100%.
+- The order list being changed while iterated (crash), and deliveries to players who logged out.
+- Keyboard: `End` was sent as `Down`, and `=` as keypad `.`.
+- Folder paths with spaces forcing the setup screen on every launch.
+- Deleting a hard disk image with one click (now shift-click).
+- Any player could sneak-click and pick up someone else's monitor.
+
+**Known limits:**
+- **Mouse wheel.** 86Box's automation socket has no mouse wheel command yet (#302).
+- **Sound.** The owner hears the PC through 86Box. Other players hear nothing, because
+  the automation socket can't export audio yet.
+- **Platforms.** Nightly builds are made for 64-bit Windows. Other systems can point
+  `custom86BoxExe` at their own 86Box built with `-D AUTOMATION=ON`.
+- **One PC at a time.** Each player can run one PC at a time.
+- **Tablet text.** The tablet's built-in screens are English only (#60).
+
+## Possible upstream improvements to 86Box
+
+- **Reply latency.** The automation socket sends each reply in two writes, the JSON
+  and then a newline, which adds up to 40–200 ms per request because of Nagle's
+  algorithm. The mod works around this, but setting `TCP_NODELAY`, or sending the
+  newline together with the reply, would fix it in 86Box itself.
+- **Missing commands.** A mouse-wheel command and an audio stream would close the
+  last gaps.
+- **Official builds.** Turning `AUTOMATION` on in the official builds would let the
+  mod use them directly.
+
+## Credits and license
+
+Original mod by DeltaTwoForce and contributors. 86Box by the 86Box team. This fork
+is under the GNU GPL v3 or later, the same as the original (see `LICENSE` and `GPLv3`).
+86Box is GPL v2 or later.

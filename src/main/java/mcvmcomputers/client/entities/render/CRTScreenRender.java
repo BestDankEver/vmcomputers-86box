@@ -54,7 +54,7 @@ public class CRTScreenRender extends EntityRenderer<EntityCRTScreen>{
 		Quaternion look = MVCUtils.lookAt(entity.getPos(), entity.getLookAtPos());
 		matrices.multiply(look);
 		MinecraftClient.getInstance().getItemRenderer().renderItem(new ItemStack(ItemList.ITEM_CRTSCREEN), Mode.NONE, light, OverlayTexture.DEFAULT_UV, matrices, vertexConsumers);
-		if(ClientMod.vmScreenTextures.containsKey(UUID.fromString(entity.getOwnerUUID()))) {
+		if(!entity.getOwnerUUID().isEmpty() && ClientMod.vmScreenTextures.containsKey(UUID.fromString(entity.getOwnerUUID()))) {
 			matrices.push();
 			matrices.scale(0.006f, 0.006f, 0.006f);
 			matrices.multiply(new Quaternion(22.5f, 0f, 0f, true));

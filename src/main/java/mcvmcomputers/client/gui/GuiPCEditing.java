@@ -1,6 +1,5 @@
 package mcvmcomputers.client.gui;
 
-import java.awt.Color;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -105,7 +104,8 @@ public class GuiPCEditing extends Screen {
 	private String signature() {
 		VmSession v = ClientMod.vm;
 		return openCase + "|" + scroll + "|" + width + "x" + height + "|" + System.identityHashCode(pc.getHardwareTag()) + "|"
-				+ running() + "|" + (v == null ? "-" : v.state()) + "|" + ClientMod.vmPreparing + "|" + ClientMod.anyRunning();
+				+ running() + "|" + (v == null ? "-" : v.state()) + "|" + ClientMod.vmPreparing + "|" + ClientMod.anyRunning() + "|"
+				+ ClientMod.vmStatus;
 	}
 
 	private void rebuild() {
@@ -409,7 +409,10 @@ public class GuiPCEditing extends Screen {
 		if (!openCase) {
 			panelX = MVCUtils.lerp(panelX, 0, delta / 1.5f);
 		}
-		introScale = MVCUtils.lerp(introScale, 1f, delta / 4f);
+		introScale = MVCUtils.lerp(introScale, 1f, Math.max(0f, Math.min(1f, delta / 4f)));
+		if (Float.isNaN(introScale)) {
+			introScale = 1f;
+		}
 		renderCase();
 
 		RenderSystem.disableDepthTest();
@@ -430,8 +433,10 @@ public class GuiPCEditing extends Screen {
 
 	private void renderCase() {
 		HardwareSpec s = pc.getHardware();
-		this.fillGradient(new MatrixStack(), 0, 0, this.width, this.height, new Color(0f, 0f, 0f, Math.max(0.5f * introScale, 0)).getRGB(),
-				new Color(0f, 0f, 0f, 0.5f * introScale).getRGB());
+		// The original built java.awt.Color from this and crashed when the value left 0..1 (issue #198).
+		float shade = Float.isNaN(introScale) ? 1f : Math.max(0f, Math.min(1f, introScale));
+		int dim = ((int) (shade * 0.5f * 255f)) << 24;
+		this.fillGradient(new MatrixStack(), 0, 0, this.width, this.height, dim, dim);
 		RenderSystem.pushMatrix();
 		RenderSystem.enableRescaleNormal();
 		RenderSystem.enableAlphaTest();

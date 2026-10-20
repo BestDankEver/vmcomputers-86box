@@ -78,7 +78,7 @@ public class EntityWallTV extends Entity{
 	@Override
 	public ActionResult interact(PlayerEntity player, Hand hand) {
 		if(!player.world.isClient) {
-			if(player.isSneaking()) {
+			if(player.isSneaking() && (getOwnerUUID().isEmpty() || getOwnerUUID().equals(player.getUuid().toString()))) {
 				this.kill();
 				player.world.spawnEntity(new ItemEntity(player.world,
 						this.getPos().x, this.getPos().y, this.getPos().z,

@@ -300,7 +300,7 @@ public class MainMod implements ModInitializer {
 					dup |= d.file.equals(file);
 				}
 				if (!dup) {
-					s.hardDisks.add(new DiskPart(file, ItemHarddrive.sizeOf(stack)));
+					s.hardDisks.add(new DiskPart(file, ItemHarddrive.sizeOf(stack), ItemHarddrive.customNameOf(stack)));
 					ok = true;
 				}
 			}
@@ -376,7 +376,7 @@ public class MainMod implements ModInitializer {
 		case SLOT_HDD:
 			if (index >= 0 && index < s.hardDisks.size()) {
 				DiskPart d = s.hardDisks.remove(index);
-				give(player, ItemHarddrive.createHardDrive(d.file, d.sizeMb));
+				give(player, ItemHarddrive.createHardDrive(d.file, d.sizeMb, d.customName));
 			}
 			break;
 		default:

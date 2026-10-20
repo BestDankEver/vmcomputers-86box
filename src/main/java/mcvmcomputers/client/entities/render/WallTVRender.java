@@ -57,7 +57,7 @@ public class WallTVRender extends EntityRenderer<EntityWallTV>{
 		matrices.translate(0, 0, -0.1);
 		MinecraftClient.getInstance().getItemRenderer().renderItem(new ItemStack(ItemList.ITEM_WALLTV), Mode.NONE, light, OverlayTexture.DEFAULT_UV, matrices, vertexConsumers);
 		matrices.pop();
-		if(ClientMod.vmScreenTextures.containsKey(UUID.fromString(entity.getOwnerUUID()))) {
+		if(!entity.getOwnerUUID().isEmpty() && ClientMod.vmScreenTextures.containsKey(UUID.fromString(entity.getOwnerUUID()))) {
 			matrices.push();
 			matrices.scale(0.0198f, 0.014f, 0.006f);
 			matrices.multiply(new Quaternion(0, 0, 180, true));

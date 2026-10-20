@@ -21,7 +21,7 @@ public final class HardwareNbt {
 	public static CompoundTag write(HardwareSpec s) {
 		CompoundTag t = new CompoundTag();
 		if (s.motherboard != null) {
-			t.put("Motherboard", part(s.motherboard));
+			t.put("Motherboard", partToTag(s.motherboard));
 		}
 		if (s.cpu != null) {
 			CompoundTag c = new CompoundTag();
@@ -52,6 +52,9 @@ public final class HardwareNbt {
 			CompoundTag dt = new CompoundTag();
 			dt.putString("File", d.file);
 			dt.putInt("SizeMb", d.sizeMb);
+			if (!d.customName.isEmpty()) {
+				dt.putString("CustomName", d.customName);
+			}
 			disks.add(dt);
 		}
 		t.put("HardDisks", disks);
@@ -66,7 +69,7 @@ public final class HardwareNbt {
 			return s;
 		}
 		if (t.contains("Motherboard", TAG_COMPOUND)) {
-			s.motherboard = part(t.getCompound("Motherboard"));
+			s.motherboard = tagToPart(t.getCompound("Motherboard"));
 		}
 		if (t.contains("Cpu", TAG_COMPOUND)) {
 			CompoundTag c = t.getCompound("Cpu");
@@ -90,7 +93,7 @@ public final class HardwareNbt {
 		ListTag disks = t.getList("HardDisks", TAG_COMPOUND);
 		for (int i = 0; i < disks.size(); i++) {
 			CompoundTag dt = disks.getCompound(i);
-			s.hardDisks.add(new DiskPart(dt.getString("File"), dt.getInt("SizeMb")));
+			s.hardDisks.add(new DiskPart(dt.getString("File"), dt.getInt("SizeMb"), dt.getString("CustomName")));
 		}
 		ListTag fi = t.getList("FloppyImages", TAG_STRING);
 		for (int i = 0; i < fi.size(); i++) {
@@ -103,28 +106,28 @@ public final class HardwareNbt {
 		return s;
 	}
 
-	private static CompoundTag part(Part p) {
+	private static CompoundTag partToTag(Part p) {
 		CompoundTag t = new CompoundTag();
 		t.putString("Id", p.id);
 		t.putString("Name", p.name);
 		return t;
 	}
 
-	private static Part part(CompoundTag t) {
+	private static Part tagToPart(CompoundTag t) {
 		return new Part(t.getString("Id"), t.getString("Name"));
 	}
 
 	private static ListTag parts(java.util.List<Part> list) {
 		ListTag l = new ListTag();
 		for (Part p : list) {
-			l.add(part(p));
+			l.add(partToTag(p));
 		}
 		return l;
 	}
 
 	private static void readParts(ListTag l, java.util.List<Part> into) {
 		for (int i = 0; i < l.size(); i++) {
-			into.add(part(l.getCompound(i)));
+			into.add(tagToPart(l.getCompound(i)));
 		}
 	}
 

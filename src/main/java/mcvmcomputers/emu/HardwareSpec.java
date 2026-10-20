@@ -63,10 +63,17 @@ public final class HardwareSpec {
 		/** Image file name inside the hard disk folder. */
 		public final String file;
 		public final int sizeMb;
+		/** The item's custom (anvil) name as Minecraft text JSON, kept so it survives a trip into the PC. */
+		public final String customName;
 
 		public DiskPart(String file, int sizeMb) {
+			this(file, sizeMb, "");
+		}
+
+		public DiskPart(String file, int sizeMb, String customName) {
 			this.file = file;
 			this.sizeMb = sizeMb;
+			this.customName = customName == null ? "" : customName;
 		}
 	}
 

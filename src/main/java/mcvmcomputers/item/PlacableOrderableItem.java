@@ -37,7 +37,11 @@ public class PlacableOrderableItem extends OrderableItem{
 	
 	@Override
 	public TypedActionResult<ItemStack> use(World world, PlayerEntity user, Hand hand) {
-		if(!world.isClient && hand == Hand.MAIN_HAND) {
+		if(hand != Hand.MAIN_HAND) {
+			// Placement (and its preview) is main hand only; the off hand used to crash the game.
+			return new TypedActionResult<ItemStack>(ActionResult.PASS, user.getStackInHand(hand));
+		}
+		if(!world.isClient) {
 			user.getStackInHand(hand).decrement(1);
 			HitResult hr = user.raycast(5, 0f, false);
 			Entity ek;
@@ -55,7 +59,7 @@ public class PlacableOrderableItem extends OrderableItem{
 			}
 		}
 		
-		if(world.isClient) {
+		if(world.isClient && ClientMod.thePreviewEntity != null) {
 			world.playSound(ClientMod.thePreviewEntity.getX(),
 							ClientMod.thePreviewEntity.getY(),
 							ClientMod.thePreviewEntity.getZ(),
