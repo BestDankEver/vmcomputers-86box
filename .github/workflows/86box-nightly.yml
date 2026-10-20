@@ -11,9 +11,6 @@
 name: 86Box nightly
 
 on:
-  push:
-    paths:
-      - .github/workflows/86box-nightly.yml
   schedule:
     - cron: "17 6 * * *"   # every day, 06:17 UTC
   workflow_dispatch:
@@ -104,25 +101,36 @@ jobs:
       - name: Collect DLLs
         working-directory: 86Box
         run: |
-          exe=$(find build/artifacts -name 86Box.exe | head -1)
+          set +e +o pipefail  # "no extra DLLs needed" is fine, not an error
+          exe=$(find build/artifacts build -name 86Box.exe 2>/dev/null | head -1)
+          if [ -z "$exe" ]; then
+            echo "86Box.exe not found after install:"; find build -maxdepth 3 -name '*.exe'
+            exit 1
+          fi
+          echo "Found $exe"
           dir=$(dirname "$exe")
           # Copy every MSYS2 DLL the executable needs next to it, recursively.
           for pass in 1 2 3; do
             for f in "$dir"/*.exe "$dir"/*.dll; do
               [ -e "$f" ] || continue
-              ntldd -R "$f" | grep -i ucrt64 | sed -E 's/.* => ([^ ]+) .*/\1/' | tr '\\' '/' | while read -r dll; do
+              for dll in $(ntldd -R "$f" 2>/dev/null | grep -i 'ucrt64' | sed -E 's/.* => ([^ ]+) .*/\1/' | tr '\\' '/'); do
                 dll=$(cygpath -u "$dll")
-                [ -e "$dir/$(basename "$dll")" ] || cp "$dll" "$dir/"
+                if [ -e "$dll" ] && [ ! -e "$dir/$(basename "$dll")" ]; then
+                  echo "  + $(basename "$dll")"
+                  cp "$dll" "$dir/"
+                fi
               done
             done
           done
           ls -la "$dir"
-          mkdir -p ../out
-          (cd "$dir" && zip -r -9 "$GITHUB_WORKSPACE/out/86Box-Windows-x64.zip" .)
+          ws=$(cygpath -u "$GITHUB_WORKSPACE")  # MSYS2 wants /d/a/... not D:\a\...
+          mkdir -p "$ws/out"
+          (cd "$dir" && zip -r -9 "$ws/out/86Box-Windows-x64.zip" .) || exit 1
+          ls -la "$ws/out"
       - uses: actions/upload-artifact@v4
         with:
           name: windows
-          path: out/86Box-Windows-x64.zip
+          path: ${{ github.workspace }}/out/86Box-Windows-x64.zip
 
   catalog:
     name: Parts catalog
@@ -162,7 +170,7 @@ jobs:
           ninja -C build
       - name: Build and run the catalog tool
         run: |
-          repo/tools/catalog/build.sh 86Box 86Box/build ./86box-catalog
+          bash repo/tools/catalog/build.sh 86Box 86Box/build ./86box-catalog
           mkdir -p out
           ./86box-catalog roms out/catalog.json ${{ needs.check.outputs.emu_sha }}
           python3 -c "import json; d=json.load(open('out/catalog.json')); print(len(d['machines']), 'machines')"
