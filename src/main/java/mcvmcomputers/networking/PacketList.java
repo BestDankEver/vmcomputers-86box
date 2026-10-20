@@ -16,6 +16,8 @@ public class PacketList {
 	public static final Identifier C2S_REMOVE_PART = new Identifier("mcvmcomputers", "c2s_remove_part");
 	/** Remember which floppy/CD image is in which drive. */
 	public static final Identifier C2S_SET_MEDIA = new Identifier("mcvmcomputers", "c2s_set_media");
+	/** New settings for an installed part: entity id, slot, index, new display name, then key/value pairs. */
+	public static final Identifier C2S_CONFIGURE_PART = new Identifier("mcvmcomputers", "c2s_configure_part");
 
 	// Server to client
 	public static final Identifier S2C_SCREEN = new Identifier("mcvmcomputers", "s2c_screen_v2");

@@ -51,10 +51,18 @@ and compatibility always matches what 86Box will actually run.
    **Showing: fits my board** narrows it to parts that fit the board in your cart,
    in the PC you last opened, or in your inventory. Pay in iron ingots at the delivery chest.
    Graphics accelerators (3dfx Voodoo Graphics, Voodoo 2 and friends, the 8514/A, XGA and
-   Display Adapter II) are at the top of the **Video** tab. **Pick...** opens the same
-   settings as 86Box's Configure dialog: memory, SLI, filtering and so on.
+   Display Adapter II) are at the top of the **Video** tab.
+   **Setup** on any part opens the same settings as its 86Box Configure dialog: BIOS
+   version, video memory, IRQ and address jumpers, SLI and so on. Motherboards also cover
+   their built-in video, sound and network chips, and CPUs that took a separate math
+   coprocessor (8087, 287, 387...) let you add one. **Add** buys a part with 86Box's defaults.
+   Installed parts have a **Setup** button in the open case too (with the PC off).
 4. Place a PC case and right-click it. **Open case** to install the motherboard, CPU,
-   RAM, cards and drives. Right-click a **Hard Drive** item to create its disk first.
+   RAM, cards and drives. Right-click a **Hard Drive** item to create its disk first:
+   like 86Box's New Hard Disk dialog, you pick the image format (raw, fixed-size VHD,
+   dynamic-size VHD or a differencing VHD based on another disk), the size, a standard
+   drive type or exact cylinders/heads/sectors, what controller it's for, and the drive
+   model, which sets how fast it is.
 5. Close the case and click **Turn on**. The first time, 86Box and its ROM set (about
    150 MB) download automatically.
 6. Right-click a monitor to use the PC. The default key combo to leave is

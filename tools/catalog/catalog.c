@@ -33,6 +33,7 @@
 #include <86box/sound.h>
 #include <86box/network.h>
 #include <86box/scsi.h>
+#include <86box/hdd.h>
 #include <86box/hdc.h>
 #include <86box/fdd.h>
 #include <86box/fdc.h>
@@ -118,6 +119,20 @@ typedef const device_t *(*getdev_fn)(int);
 typedef const char *(*getname_fn)(int);
 typedef int (*avail_fn)(int);
 
+static void device_options(const device_t *dev);
+
+/* A device's settings section name and options, for anything with a Configure dialog. */
+static void
+device_settings(const device_t *dev)
+{
+    if ((dev == NULL) || (dev->config == NULL))
+        return;
+    fputs(", \"section\": ", out);
+    jstr(dev->name);
+    fputs(", \"options\": ", out);
+    device_options(dev);
+}
+
 static void
 device_list(const char *key, getdev_fn getdev, getname_fn getname, avail_fn available, int *first)
 {
@@ -146,6 +161,7 @@ device_list(const char *key, getdev_fn getdev, getname_fn getname, avail_fn avai
         jstr(name);
         fprintf(out, ", \"flags\": %" PRIu32 ", \"machines\": ", (uint32_t) dev->flags);
         machine_bitset(dev);
+        device_settings(dev);
         fputs("}", out);
         n++;
     }
@@ -396,13 +412,10 @@ accel_list(int *first)
         accel_machine_bitset(a);
         fputs(",\n      \"key\": ", out);
         jstr(a->key);
-        /* 86Box keeps a device's settings in a section named after the device. */
-        fputs(", \"section\": ", out);
-        jstr(a->dev->name);
         fputs(", \"conflicts\": ", out);
         accel_conflicts(a);
-        fputs(",\n      \"options\": ", out);
-        device_options(a->dev);
+        /* 86Box keeps a device's settings in a section named after the device. */
+        device_settings(a->dev);
         fputs("}", out);
         n++;
     }
@@ -474,7 +487,24 @@ main(int argc, char **argv)
         for (int c = 0; fam->cpus[c].cpu_type != 0; c++) {
             fprintf(out, "%s{\"name\": ", c ? ", " : "");
             jstr(fam->cpus[c].name);
-            fprintf(out, ", \"hz\": %" PRIu32 ", \"multi\": %.17g}", fam->cpus[c].rspeed, fam->cpus[c].multi);
+            fprintf(out, ", \"hz\": %" PRIu32 ", \"multi\": %.17g", fam->cpus[c].rspeed, fam->cpus[c].multi);
+            /* Optional math coprocessors (the [Machine] fpu_type key), when there's a choice. */
+            const FPU *fpus = fam->cpus[c].fpus;
+            int        nfpu = 0;
+            while ((fpus != NULL) && (fpus[nfpu].name != NULL))
+                nfpu++;
+            if (nfpu > 1) {
+                fputs(", \"fpus\": [", out);
+                for (int k = 0; k < nfpu; k++) {
+                    fputs(k ? ", [" : "[", out);
+                    jstr(fpus[k].internal_name);
+                    fputs(", ", out);
+                    jstr(fpus[k].name);
+                    fputs("]", out);
+                }
+                fputs("]", out);
+            }
+            fputs("}", out);
         }
         fputs("]}", out);
     }
@@ -510,6 +540,36 @@ main(int argc, char **argv)
         if ((ob = onboard(machine_get_net_device(m))) && machine_has_flags(m, MACHINE_NIC_PRI)) {
             fputs(", \"onboard_network\": ", out);
             jstr(ob);
+        }
+
+        /* Settings: the board's own Configure dialog (usually its BIOS version), then
+           those of its built-in video, sound and network chips. Keys in the mod are
+           prefixed so one board can carry all of them. */
+        {
+            struct {
+                const char     *prefix;
+                const char     *label;
+                const device_t *dev;
+            } groups[] = {
+                { "",       "Motherboard",       machine_get_device(m) },
+                { "video/", "On-board video",    machine_has_flags(m, MACHINE_VIDEO) ? machine_get_vid_device(m) : NULL },
+                { "sound/", "On-board sound",    machine_has_flags(m, MACHINE_SOUND) ? machine_get_snd_device(m) : NULL },
+                { "net/",   "On-board network",  machine_has_flags(m, MACHINE_NIC_PRI) ? machine_get_net_device(m) : NULL },
+            };
+            int ng = 0;
+            for (size_t g = 0; g < sizeof(groups) / sizeof(groups[0]); g++) {
+                const device_t *d = groups[g].dev;
+                if ((d == NULL) || (d->config == NULL) || (d->config[0].type == CONFIG_END))
+                    continue;
+                fputs(ng++ ? ",\n      {\"prefix\": " : ", \"settings\": [\n      {\"prefix\": ", out);
+                jstr(groups[g].prefix);
+                fputs(", \"label\": ", out);
+                jstr(groups[g].label);
+                device_settings(d);
+                fputs("}", out);
+            }
+            if (ng)
+                fputs("]", out);
         }
 
         /* Eligible CPUs: [[family index, [cpu indices...]], ...] */
@@ -560,6 +620,23 @@ main(int argc, char **argv)
         fprintf(out, ", \"bus\": %d, \"speed\": %d}", cdrom_drive_types[t].bus_type, cdrom_drive_types[t].speed);
     }
     fputs("\n  ],\n", out);
+
+    /* Hard disk models (the hdd_NN_speed key): generic speed classes and real drives. */
+    fputs("  \"hdd_models\": [", out);
+    for (int i = 0; i < hdd_preset_get_num(); i++) {
+        fprintf(out, "%s\n    [", i ? "," : "");
+        jstr(hdd_preset_get_internal_name(i));
+        fputs(", ", out);
+        jstr(hdd_preset_getname(i));
+        fputs("]", out);
+    }
+    fputs("\n  ],\n", out);
+
+    /* Standard drive types [cylinders, heads, sectors], as in the New Hard Disk dialog. */
+    fputs("  \"hdd_types\": [", out);
+    for (int i = 0; (i < 127) && hdd_table[i][0]; i++)
+        fprintf(out, "%s[%u, %u, %u]", i ? ", " : "", hdd_table[i][0], hdd_table[i][1], hdd_table[i][2]);
+    fputs("],\n", out);
 
     /* Expansion cards, each with the machines it fits. */
     fputs("  \"cards\": {", out);

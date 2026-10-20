@@ -29,11 +29,23 @@ public final class HardwareSpec {
 	public static final class Part {
 		public final String id;
 		public final String name;
+		/** Settings, as 86Box stores them. A motherboard's built-in chips use prefixed keys ("video/memory"). */
+		public final Map<String, String> options;
 
 		public Part(String id, String name) {
+			this(id, name, null);
+		}
+
+		public Part(String id, String name, Map<String, String> options) {
 			this.id = id;
 			this.name = (name == null || name.isEmpty()) ? id : name;
+			this.options = copy(options);
 		}
+	}
+
+	static Map<String, String> copy(Map<String, String> options) {
+		return options == null || options.isEmpty() ? Collections.<String, String>emptyMap()
+				: Collections.unmodifiableMap(new LinkedHashMap<>(options));
 	}
 
 	public static final class CpuPart {
@@ -41,12 +53,19 @@ public final class HardwareSpec {
 		public final long hz;
 		public final double multi;
 		public final String name;
+		/** Math coprocessor (86Box's fpu_type), "" = none/built-in. */
+		public final String fpu;
 
 		public CpuPart(String family, long hz, double multi, String name) {
+			this(family, hz, multi, name, "");
+		}
+
+		public CpuPart(String family, long hz, double multi, String name, String fpu) {
 			this.family = family;
 			this.hz = hz;
 			this.multi = multi;
 			this.name = (name == null || name.isEmpty()) ? family : name;
+			this.fpu = fpu == null ? "" : fpu;
 		}
 	}
 
@@ -65,26 +84,68 @@ public final class HardwareSpec {
 			this.category = category;
 			this.id = id;
 			this.name = (name == null || name.isEmpty()) ? id : name;
-			this.options = options == null || options.isEmpty() ? Collections.<String, String>emptyMap()
-					: Collections.unmodifiableMap(new LinkedHashMap<>(options));
+			this.options = copy(options);
 		}
 	}
 
 	public static final class DiskPart {
+		public static final String RAW = "raw", VHD_FIXED = "vhd_fixed", VHD_DYNAMIC = "vhd_dynamic", VHD_DIFF = "vhd_diff";
+
 		/** Image file name inside the hard disk folder. */
 		public final String file;
 		public final int sizeMb;
 		/** The item's custom (anvil) name as Minecraft text JSON, kept so it survives a trip into the PC. */
 		public final String customName;
+		/** Geometry; 0 = work it out from the size and the controller (disks made before geometry was stored). */
+		public final int cylinders, heads, sectors;
+		/** Drive model (86Box's hdd_NN_speed preset), "" = 86Box's default for the bus. */
+		public final String model;
+		/** How 86Box should create the image if the file doesn't exist yet. */
+		public final String format;
+		/** Differencing VHDs: the parent disk's file name. */
+		public final String parent;
 
 		public DiskPart(String file, int sizeMb) {
 			this(file, sizeMb, "");
 		}
 
 		public DiskPart(String file, int sizeMb, String customName) {
+			this(file, sizeMb, customName, 0, 0, 0, "", RAW, "");
+		}
+
+		public DiskPart(String file, int sizeMb, String customName, int cylinders, int heads, int sectors, String model,
+				String format, String parent) {
 			this.file = file;
-			this.sizeMb = sizeMb;
 			this.customName = customName == null ? "" : customName;
+			this.cylinders = Math.max(0, cylinders);
+			this.heads = Math.max(0, heads);
+			this.sectors = Math.max(0, sectors);
+			this.sizeMb = hasGeometry() ? (int) Math.max(1, (long) this.cylinders * this.heads * this.sectors / 2048L) : sizeMb;
+			this.model = model == null ? "" : model;
+			this.format = format == null || format.isEmpty() ? RAW : format;
+			this.parent = parent == null ? "" : parent;
+		}
+
+		public boolean hasGeometry() {
+			return cylinders > 0 && heads > 0 && sectors > 0;
+		}
+
+		public DiskPart withModel(String m) {
+			return new DiskPart(file, sizeMb, customName, cylinders, heads, sectors, m, format, parent);
+		}
+	}
+
+	/** Largest geometry 86Box accepts per disk interface: {sectors, heads, cylinders}. */
+	public static int[] geometryLimits(String bus) {
+		switch (bus) {
+		case "mfm":
+			return new int[] { 26, 15, 2047 };
+		case "xta":
+			return new int[] { 63, 16, 1023 };
+		case "esdi":
+			return new int[] { 99, 16, 266305 };
+		default:
+			return new int[] { 255, 255, 266305 };
 		}
 	}
 
@@ -226,6 +287,23 @@ public final class HardwareSpec {
 			}
 			// No floppy controller check: nearly every board gets one from its Super I/O
 			// chip or from 86Box's machine setup, and 86Box doesn't flag those.
+		}
+		if (cat != null && m != null) {
+			String bus = ConfigWriter.diskBus(this, cat);
+			int[] lim = geometryLimits(bus);
+			for (DiskPart d : hardDisks) {
+				if (d.hasGeometry() && (d.sectors > lim[0] || d.heads > lim[1] || d.cylinders > lim[2])) {
+					out.add(new Problem(false, "The disk " + d.file + " (" + d.cylinders + "/" + d.heads + "/" + d.sectors
+							+ ") is too big for this " + bus.toUpperCase(Locale.ROOT) + " controller; 86Box will cut it down."));
+				}
+			}
+		}
+		for (DiskPart d : hardDisks) {
+			for (DiskPart p : hardDisks) {
+				if (!d.parent.isEmpty() && d.parent.equals(p.file)) {
+					out.add(new Problem(true, d.file + " is based on " + p.file + "; they can't be in the same PC (the base disk must stay unchanged)."));
+				}
+			}
 		}
 		if (hardDisks.size() + cdroms.size() > MAX_IDE_DEVICES) {
 			out.add(new Problem(true, "Too many drives: hard disks and CD-ROM drives share " + MAX_IDE_DEVICES + " positions."));

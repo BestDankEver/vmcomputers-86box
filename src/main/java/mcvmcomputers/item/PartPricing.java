@@ -30,7 +30,8 @@ public final class PartPricing {
 			return clamp(3 + p.getInt("Type") / 3, 3, 14);
 		case CPU: {
 			long mhz = p.getLong("Hz") / 1_000_000L;
-			return clamp(2 + (int) (mhz / 40), 2, 20);
+			// A separate math coprocessor was an expensive extra.
+			return clamp(2 + (int) (mhz / 40), 2, 20) + (p.getString("Fpu").isEmpty() ? 0 : 2);
 		}
 		case RAM: {
 			int kb = p.getInt("Kb");

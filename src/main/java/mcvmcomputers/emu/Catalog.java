@@ -67,16 +67,21 @@ public final class Catalog {
 	}
 
 	public static final class CpuModel {
+		public static final String FPU_KEY = "fpu_type";
+
 		public final int index;
 		public final String name;
 		public final long hz;
 		public final double multi;
+		/** Math coprocessors this CPU can have (the [Machine] fpu_type key); empty when there's no choice. */
+		public final OptionSet fpu;
 
-		CpuModel(int index, String name, long hz, double multi) {
+		CpuModel(int index, String name, long hz, double multi, OptionSet fpu) {
 			this.index = index;
 			this.name = name;
 			this.hz = hz;
 			this.multi = multi;
+			this.fpu = fpu;
 		}
 
 		/** "75 MHz" style label from the clock. */
@@ -137,6 +142,8 @@ public final class Catalog {
 		public final boolean videoFixed;
 		/** CPU family index to the CPU indices this board accepts. */
 		public final Map<Integer, int[]> cpus;
+		/** The board's own settings (BIOS version etc.) and its built-in chips'. */
+		public List<SettingsGroup> settings = Collections.emptyList();
 
 		Machine(int index, String id, String name, int type, long bus, long flags, int ramMinKb, int ramMaxKb,
 				int ramStepKb, String onboardVideo, String onboardSound, String onboardNetwork, boolean videoFixed,
@@ -249,35 +256,21 @@ public final class Catalog {
 		}
 	}
 
-	public static final class Card {
-		public final CardCategory category;
-		public final String id;
-		public final String name;
-		public final long deviceFlags;
-		private final BitSet machines;
-		/** Add-on cards only: the [Video] key that switches it on (e.g. "voodoo"). */
-		public final String configKey;
-		/** The 86Box config section holding this card's settings (its device name). */
-		public final String section;
-		/** Add-on cards only: main video cards it can't be used alongside. */
-		public final Set<String> conflicts;
+	/**
+	 * The settings of one 86Box device (its Configure dialog), with the rules
+	 * that keep a set of values valid.
+	 */
+	public static final class OptionSet {
+		public static final OptionSet EMPTY = new OptionSet(Collections.<CardOption>emptyList());
+
 		public final List<CardOption> options;
 
-		Card(CardCategory category, String id, String name, long deviceFlags, BitSet machines, String configKey,
-				String section, Set<String> conflicts, List<CardOption> options) {
-			this.category = category;
-			this.id = id;
-			this.name = name;
-			this.deviceFlags = deviceFlags;
-			this.machines = machines;
-			this.configKey = configKey;
-			this.section = section;
-			this.conflicts = conflicts;
+		public OptionSet(List<CardOption> options) {
 			this.options = options;
 		}
 
-		public boolean fits(Machine m) {
-			return m != null && machines.get(m.index);
+		public boolean isEmpty() {
+			return options.isEmpty();
 		}
 
 		public CardOption option(String name) {
@@ -289,16 +282,28 @@ public final class Catalog {
 			return null;
 		}
 
-		/** The variant chosen in {@code values}, or the default one. */
-		public OptionChoice variant(Map<String, String> values) {
+		/** The option that picks the model or BIOS (CONFIG_BIOS), if there is one. */
+		public CardOption variantOption() {
 			for (CardOption o : options) {
 				if (CardOption.VARIANT.equals(o.kind)) {
-					String v = values == null ? null : values.get(o.name);
-					OptionChoice c = o.choice(v == null ? o.def : v);
-					return c != null ? c : (o.choices.isEmpty() ? null : o.choices.get(0));
+					return o;
 				}
 			}
 			return null;
+		}
+
+		/** The variant chosen in {@code values}, or the default one. */
+		public OptionChoice variant(Map<String, String> values) {
+			CardOption o = variantOption();
+			if (o == null) {
+				return null;
+			}
+			String v = values == null ? null : values.get(o.name);
+			OptionChoice c = o.choice(v == null ? o.def : v);
+			if (c == null) {
+				c = o.choice(o.def);
+			}
+			return c != null ? c : (o.choices.isEmpty() ? null : o.choices.get(0));
 		}
 
 		/**
@@ -316,7 +321,7 @@ public final class Catalog {
 					continue;
 				}
 				if (v == null || !valid(o, v)) {
-					v = o.def;
+					v = valid(o, o.def) ? o.def : (o.choices.isEmpty() ? o.def : o.choices.get(0).value);
 				}
 				if (!o.allowed(v, variant)) {
 					v = nearestAllowed(o, v, variant);
@@ -369,19 +374,153 @@ public final class Catalog {
 			return best;
 		}
 
-		/** The option that picks the model (CONFIG_BIOS), if the card has one. */
-		public CardOption variantOption() {
-			for (CardOption o : options) {
-				if (CardOption.VARIANT.equals(o.kind)) {
-					return o;
-				}
+		/** The label of a value as the Configure dialog shows it. */
+		public static String valueLabel(CardOption o, String v) {
+			if (CardOption.TOGGLE.equals(o.kind)) {
+				return "1".equals(v) ? "on" : "off";
 			}
-			return null;
+			OptionChoice c = o.choice(v);
+			return c == null ? v : c.label;
 		}
 
-		/** The card's name with the chosen model, e.g. "[PCI] 3Dfx Voodoo 2". */
+		/**
+		 * A short summary of what differs from the defaults, plus memory sizes
+		 * (the model is in the part's name, so it's left out).
+		 */
+		public String summary(Map<String, String> values) {
+			StringBuilder b = new StringBuilder();
+			Map<String, String> r = resolve(values);
+			for (CardOption o : options) {
+				if (CardOption.VARIANT.equals(o.kind)) {
+					continue;
+				}
+				String v = r.get(o.name);
+				if (v.equals(o.def) && CardOption.memorySlot(o.name) == 0) {
+					continue;
+				}
+				if (b.length() > 0) {
+					b.append(", ");
+				}
+				b.append(o.label).append(": ").append(valueLabel(o, v));
+			}
+			return b.toString();
+		}
+	}
+
+	/** One device's settings inside a part that has several (a motherboard and its built-in chips). */
+	public static final class SettingsGroup {
+		/** Prefix of this group's keys in the part's options ("" for the board itself, "video/", ...). */
+		public final String prefix;
+		public final String label;
+		/** The 86Box config section the values go in. */
+		public final String section;
+		public final OptionSet set;
+
+		public SettingsGroup(String prefix, String label, String section, OptionSet set) {
+			this.prefix = prefix;
+			this.label = label;
+			this.section = section;
+			this.set = set;
+		}
+
+		/** This group's values out of a part's prefixed options. */
+		public Map<String, String> pick(Map<String, String> all) {
+			Map<String, String> out = new LinkedHashMap<>();
+			if (all != null) {
+				for (Map.Entry<String, String> e : all.entrySet()) {
+					if (e.getKey().startsWith(prefix) && (!prefix.isEmpty() || e.getKey().indexOf('/') < 0)) {
+						out.put(e.getKey().substring(prefix.length()), e.getValue());
+					}
+				}
+			}
+			return out;
+		}
+
+		/** All groups resolved, as prefixed keys. */
+		public static Map<String, String> resolveAll(List<SettingsGroup> groups, Map<String, String> all) {
+			Map<String, String> out = new LinkedHashMap<>();
+			for (SettingsGroup g : groups) {
+				for (Map.Entry<String, String> e : g.set.resolve(g.pick(all)).entrySet()) {
+					out.put(g.prefix + e.getKey(), e.getValue());
+				}
+			}
+			return out;
+		}
+
+		public static String summaryAll(List<SettingsGroup> groups, Map<String, String> all) {
+			StringBuilder b = new StringBuilder();
+			for (SettingsGroup g : groups) {
+				String part = g.set.summary(g.pick(all));
+				CardOption v = g.set.variantOption();
+				if (v != null) {
+					OptionChoice c = g.set.variant(g.pick(all));
+					if (c != null) {
+						part = v.label + ": " + c.label + (part.isEmpty() ? "" : ", " + part);
+					}
+				}
+				if (!part.isEmpty()) {
+					if (b.length() > 0) {
+						b.append("; ");
+					}
+					b.append(part);
+				}
+			}
+			return b.toString();
+		}
+	}
+
+	public static final class Card {
+		public final CardCategory category;
+		public final String id;
+		public final String name;
+		public final long deviceFlags;
+		private final BitSet machines;
+		/** Add-on cards only: the [Video] key that switches it on (e.g. "voodoo"). */
+		public final String configKey;
+		/** The 86Box config section holding this card's settings (its device name). */
+		public final String section;
+		/** Add-on cards only: main video cards it can't be used alongside. */
+		public final Set<String> conflicts;
+		public final OptionSet settings;
+		public final List<CardOption> options;
+
+		Card(CardCategory category, String id, String name, long deviceFlags, BitSet machines, String configKey,
+				String section, Set<String> conflicts, OptionSet settings) {
+			this.category = category;
+			this.id = id;
+			this.name = name;
+			this.deviceFlags = deviceFlags;
+			this.machines = machines;
+			this.configKey = configKey;
+			this.section = section;
+			this.conflicts = conflicts;
+			this.settings = settings;
+			this.options = settings.options;
+		}
+
+		public boolean fits(Machine m) {
+			return m != null && machines.get(m.index);
+		}
+
+		public CardOption variantOption() {
+			return settings.variantOption();
+		}
+
+		public OptionChoice variant(Map<String, String> values) {
+			return settings.variant(values);
+		}
+
+		public Map<String, String> resolve(Map<String, String> values) {
+			return settings.resolve(values);
+		}
+
+		/**
+		 * The card's name, with the chosen model for add-on cards whose variants
+		 * are different products (e.g. "[PCI] 3Dfx Voodoo 2"). Other cards'
+		 * variants are BIOS versions and keep the card's name.
+		 */
 		public String displayName(Map<String, String> values) {
-			OptionChoice v = variant(values);
+			OptionChoice v = category == CardCategory.ACCEL ? variant(values) : null;
 			if (v == null || v.label.isEmpty()) {
 				return name;
 			}
@@ -389,34 +528,16 @@ public final class Catalog {
 			return (name.startsWith("[") && b > 0 ? name.substring(0, b + 2) : "") + v.label;
 		}
 
-		/** A short summary of the options that differ from the defaults (the model is in the name). */
 		public String optionSummary(Map<String, String> values) {
-			StringBuilder b = new StringBuilder();
-			Map<String, String> r = resolve(values);
-			for (CardOption o : options) {
-				String v = r.get(o.name);
-				String part = null;
-				if (CardOption.VARIANT.equals(o.kind)) {
-					continue;
-				}
-				if (!v.equals(o.def) || CardOption.memorySlot(o.name) != 0) {
-					if (CardOption.TOGGLE.equals(o.kind)) {
-						part = o.label + (v.equals("1") ? " on" : " off");
-					} else if (CardOption.SPINNER.equals(o.kind)) {
-						part = o.label + " " + v;
-					} else {
-						OptionChoice c = o.choice(v);
-						part = o.label + ": " + (c == null ? v : c.label);
-					}
-				}
-				if (part != null) {
-					if (b.length() > 0) {
-						b.append(", ");
-					}
-					b.append(part);
+			String s = settings.summary(values);
+			if (category != CardCategory.ACCEL) {
+				CardOption vo = variantOption();
+				OptionChoice v = variant(values);
+				if (vo != null && v != null && vo.choices.size() > 1) {
+					s = vo.label + ": " + v.label + (s.isEmpty() ? "" : ", " + s);
 				}
 			}
-			return b.toString();
+			return s;
 		}
 	}
 
@@ -458,6 +579,10 @@ public final class Catalog {
 	public final Map<CardCategory, List<Card>> cards;
 	public final List<DriveType> floppyDrives;
 	public final List<DriveType> cdromDrives;
+	/** Hard disk models for hdd_NN_speed: {internal name, display name}. */
+	public final List<String[]> hddModels;
+	/** Standard drive types: {cylinders, heads, sectors}. */
+	public final List<int[]> hddTypes;
 
 	private final Map<String, Machine> machinesById = new HashMap<>();
 	private final Map<String, CpuFamily> familiesById = new HashMap<>();
@@ -487,8 +612,17 @@ public final class Catalog {
 			List<CpuModel> cpus = new ArrayList<>();
 			for (Object c : Json.arr(m, "cpus")) {
 				Map<String, Object> cm = asObj(c);
+				List<OptionChoice> fpus = new ArrayList<>();
+				for (Object fo : Json.arr(cm, "fpus")) {
+					@SuppressWarnings("unchecked")
+					List<Object> pair = (List<Object>) fo;
+					fpus.add(new OptionChoice(String.valueOf(pair.get(0)), String.valueOf(pair.get(1)), -1, -1, -1, -1, false));
+				}
+				OptionSet fpu = fpus.size() < 2 ? OptionSet.EMPTY
+						: new OptionSet(Collections.singletonList(new CardOption(CpuModel.FPU_KEY, "Math coprocessor",
+								CardOption.SELECT, fpus.get(0).value, Collections.unmodifiableList(fpus), 0, 0, 1)));
 				cpus.add(new CpuModel(cpus.size(), Json.str(cm, "name", ""), Json.lng(cm, "hz", 0),
-						Json.dbl(cm, "multi", 1)));
+						Json.dbl(cm, "multi", 1), fpu));
 			}
 			CpuFamily f = new CpuFamily(fams.size(), Json.str(m, "id", ""), Json.str(m, "vendor", ""),
 					Json.str(m, "name", ""), Collections.unmodifiableList(cpus));
@@ -521,6 +655,16 @@ public final class Catalog {
 					ram == null ? 0 : Json.integer(ram, "step", 0), Json.str(m, "onboard_video", null),
 					Json.str(m, "onboard_sound", null), Json.str(m, "onboard_network", null),
 					Json.bool(m, "video_fixed", false), cpus);
+			List<SettingsGroup> groups = new ArrayList<>();
+			for (Object g : Json.arr(m, "settings")) {
+				Map<String, Object> gm = asObj(g);
+				OptionSet set = new OptionSet(parseOptions(Json.arr(gm, "options")));
+				if (!set.isEmpty()) {
+					groups.add(new SettingsGroup(Json.str(gm, "prefix", ""), Json.str(gm, "label", ""),
+							Json.str(gm, "section", ""), set));
+				}
+			}
+			mach.settings = Collections.unmodifiableList(groups);
 			ms.add(mach);
 			machinesById.put(mach.id, mach);
 		}
@@ -542,7 +686,7 @@ public final class Catalog {
 					Card c = new Card(cat, Json.str(m, "id", ""), Json.str(m, "name", ""),
 							Json.lng(m, "flags", 0), hexBits(Json.str(m, "machines", ""), ms.size()),
 							Json.str(m, "key", null), Json.str(m, "section", null),
-							Collections.unmodifiableSet(conflicts), parseOptions(Json.arr(m, "options")));
+							Collections.unmodifiableSet(conflicts), new OptionSet(parseOptions(Json.arr(m, "options"))));
 					list.add(c);
 					cardsByKey.put(cat.key + ":" + c.id, c);
 				}
@@ -569,6 +713,30 @@ public final class Catalog {
 			cdromById.put(d.id, d);
 		}
 		cdromDrives = Collections.unmodifiableList(cds);
+
+		List<String[]> models = new ArrayList<>();
+		for (Object o : Json.arr(root, "hdd_models")) {
+			@SuppressWarnings("unchecked")
+			List<Object> pair = (List<Object>) o;
+			models.add(new String[] { String.valueOf(pair.get(0)), String.valueOf(pair.get(1)) });
+		}
+		hddModels = Collections.unmodifiableList(models);
+		List<int[]> diskTypes = new ArrayList<>();
+		for (Object o : Json.arr(root, "hdd_types")) {
+			@SuppressWarnings("unchecked")
+			List<Object> t = (List<Object>) o;
+			diskTypes.add(new int[] { ((Number) t.get(0)).intValue(), ((Number) t.get(1)).intValue(), ((Number) t.get(2)).intValue() });
+		}
+		hddTypes = Collections.unmodifiableList(diskTypes);
+	}
+
+	public String hddModelName(String id) {
+		for (String[] m : hddModels) {
+			if (m[0].equals(id)) {
+				return m[1];
+			}
+		}
+		return id;
 	}
 
 	private static List<CardOption> parseOptions(List<Object> arr) {
@@ -653,6 +821,12 @@ public final class Catalog {
 			}
 		}
 		return "";
+	}
+
+	/** The catalog's model for an installed CPU, or null. */
+	public CpuModel cpuModel(String familyId, long hz, double multi) {
+		CpuFamily f = cpuFamily(familyId);
+		return f == null ? null : f.byClock(hz, multi);
 	}
 
 	/** Whether the board takes this CPU (family + speed), per 86Box's cpu_is_eligible(). */

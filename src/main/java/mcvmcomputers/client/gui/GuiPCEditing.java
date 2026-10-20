@@ -90,6 +90,78 @@ public class GuiPCEditing extends Screen {
 		ClientPlayNetworking.send(PacketList.C2S_REMOVE_PART, b);
 	}
 
+	/** Sends new settings for an installed part (the PC must be off). */
+	private void configurePart(int slot, int index, String name, java.util.Map<String, String> options) {
+		PacketByteBuf b = PacketByteBufs.create();
+		b.writeInt(pc.getEntityId());
+		b.writeInt(slot);
+		b.writeInt(index);
+		b.writeString(name == null ? "" : name);
+		b.writeInt(options.size());
+		for (java.util.Map.Entry<String, String> e : options.entrySet()) {
+			b.writeString(e.getKey());
+			b.writeString(e.getValue());
+		}
+		ClientPlayNetworking.send(PacketList.C2S_CONFIGURE_PART, b);
+	}
+
+	private void openSettings(String title, List<GuiOptions.Section> sections, java.util.Map<String, String> current,
+			java.util.function.Consumer<java.util.Map<String, String>> save) {
+		if (running()) {
+			return;
+		}
+		minecraft.openScreen(new GuiOptions(this, sections, current, v -> title, v -> lang.get("mcvmcomputers.card_options.save"), save));
+	}
+
+	/** The settings button for a part, or null when it has none (or no catalog). */
+	private Runnable motherboardSettings(Catalog.Machine m, Part board) {
+		if (m == null || m.settings.isEmpty()) {
+			return null;
+		}
+		return () -> openSettings(board.name, GuiOptions.groups(m.settings), board.options,
+				v -> configurePart(PacketList.SLOT_MOTHERBOARD, 0, board.name, v));
+	}
+
+	private Runnable cpuSettings(Catalog cat, HardwareSpec.CpuPart cpu) {
+		Catalog.CpuModel cm = cat == null ? null : cat.cpuModel(cpu.family, cpu.hz, cpu.multi);
+		if (cm == null || cm.fpu.isEmpty()) {
+			return null;
+		}
+		java.util.Map<String, String> cur = new java.util.HashMap<>();
+		if (!cpu.fpu.isEmpty()) {
+			cur.put(Catalog.CpuModel.FPU_KEY, cpu.fpu);
+		}
+		return () -> openSettings(cpu.name, GuiOptions.single(cm.fpu), cur, v -> configurePart(PacketList.SLOT_CPU, 0, cpu.name, v));
+	}
+
+	private Runnable cardSettings(Catalog cat, CardPart c, int idx) {
+		Catalog.Card card = cat == null ? null : cat.card(c.category, c.id);
+		if (card == null || card.settings.isEmpty()) {
+			return null;
+		}
+		return () -> openSettings(c.name, GuiOptions.single(card.settings), c.options,
+				v -> configurePart(PacketList.SLOT_CARD, idx, card.displayName(v), v));
+	}
+
+	private Runnable diskSettings(Catalog cat, DiskPart d, int idx) {
+		if (cat == null || cat.hddModels.isEmpty()) {
+			return null;
+		}
+		return () -> {
+			if (running()) {
+				return;
+			}
+			List<String[]> models = new ArrayList<>();
+			models.add(new String[] { "", lang.get("mcvmcomputers.hdd.model_default") });
+			models.addAll(cat.hddModels);
+			minecraft.openScreen(new GuiChoicePicker(this, lang.get("mcvmcomputers.hdd.model"), models, d.model, picked -> {
+				java.util.Map<String, String> v = new java.util.HashMap<>();
+				v.put("model", picked);
+				configurePart(PacketList.SLOT_HDD, idx, "", v);
+			}));
+		};
+	}
+
 	private void pick(GuiPartPicker.Filter filter) {
 		minecraft.openScreen(new GuiPartPicker(this, pc, filter));
 	}
@@ -254,7 +326,7 @@ public class GuiPCEditing extends Screen {
 		// Motherboard.
 		y = heading(x, y, t("mcvmcomputers.part.kind.motherboard"), top, bottom);
 		if (s.motherboard != null) {
-			y = partRow(x, y, s.motherboard.name, () -> removePart(PacketList.SLOT_MOTHERBOARD, 0), top, bottom);
+			y = partRow(x, y, s.motherboard.name, () -> removePart(PacketList.SLOT_MOTHERBOARD, 0), motherboardSettings(m, s.motherboard), top, bottom);
 			if (m != null && visible(y, top, bottom)) {
 				label(x + 6, y + 2, 0x777777, cat.machineTypeName(m.type) + ", RAM " + HardwareSpec.ramLabel(m.ramMinKb) + "-"
 						+ HardwareSpec.ramLabel(m.ramMaxKb));
@@ -268,7 +340,8 @@ public class GuiPCEditing extends Screen {
 			// CPU.
 			y = heading(x, y, t("mcvmcomputers.part.kind.cpu"), top, bottom);
 			if (s.cpu != null) {
-				y = partRow(x, y, s.cpu.name, () -> removePart(PacketList.SLOT_CPU, 0), top, bottom);
+				y = partRow(x, y, s.cpu.name + (s.cpu.fpu.isEmpty() ? "" : " + " + s.cpu.fpu.toUpperCase(java.util.Locale.ROOT)),
+						() -> removePart(PacketList.SLOT_CPU, 0), cpuSettings(cat, s.cpu), top, bottom);
 			} else {
 				y = addRow(x, y, t("mcvmcomputers.pc_editing.install"), () -> pick(GuiPartPicker.Filter.CPU), top, bottom);
 			}
@@ -288,7 +361,7 @@ public class GuiPCEditing extends Screen {
 			for (int i = 0; i < s.cards.size(); i++) {
 				final int idx = i;
 				CardPart c = s.cards.get(i);
-				y = partRow(x, y, c.name, () -> removePart(PacketList.SLOT_CARD, idx), top, bottom);
+				y = partRow(x, y, c.name, () -> removePart(PacketList.SLOT_CARD, idx), cardSettings(cat, c, idx), top, bottom);
 			}
 			if (m != null && m.onboardVideo != null && visible(y, top, bottom)) {
 				label(x + 6, y + 2, 0x777777, t("mcvmcomputers.part.onboard", m.onboardVideo));
@@ -317,7 +390,9 @@ public class GuiPCEditing extends Screen {
 		for (int i = 0; i < s.hardDisks.size(); i++) {
 			final int idx = i;
 			DiskPart d = s.hardDisks.get(i);
-			y = partRow(x, y, "HDD " + d.file + " (" + HardwareSpec.ramLabel(d.sizeMb * 1024) + ")", () -> removePart(PacketList.SLOT_HDD, idx), top, bottom);
+			String geo = d.hasGeometry() ? ", " + d.cylinders + "/" + d.heads + "/" + d.sectors : "";
+			y = partRow(x, y, "HDD " + d.file + " (" + HardwareSpec.ramLabel(d.sizeMb * 1024) + geo + ")",
+					() -> removePart(PacketList.SLOT_HDD, idx), diskSettings(cat, d, idx), top, bottom);
 		}
 		for (int i = 0; i < s.cdroms.size(); i++) {
 			final int idx = i;
@@ -358,9 +433,20 @@ public class GuiPCEditing extends Screen {
 	}
 
 	private int partRow(int x, int y, String name, Runnable remove, int top, int bottom) {
+		return partRow(x, y, name, remove, null, top, bottom);
+	}
+
+	/** A part with a remove button and, if it has settings, a Setup button (only while the PC is off). */
+	private int partRow(int x, int y, String name, Runnable remove, Runnable settings, int top, int bottom) {
 		if (visible(y, top, bottom)) {
-			String shown = this.textRenderer.trimToWidth(name, this.width - x - 26);
+			int setupW = settings == null ? 0 : this.textRenderer.getWidth(t("mcvmcomputers.pc_editing.settings")) + 8;
+			String shown = this.textRenderer.trimToWidth(name, this.width - x - 26 - (setupW > 0 ? setupW + 2 : 0));
 			label(x + 6, y + 2, 0xffffff, shown);
+			if (settings != null) {
+				ButtonWidget sb = this.addButton(new ButtonWidget(this.width - 20 - setupW, y, setupW, 12,
+						new LiteralText(t("mcvmcomputers.pc_editing.settings")), b -> settings.run()));
+				sb.active = !running();
+			}
 			this.addButton(new ButtonWidget(this.width - 18, y, 12, 12, new LiteralText("x"), b -> remove.run()));
 		}
 		return y + ROW;

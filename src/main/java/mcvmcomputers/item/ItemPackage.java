@@ -43,12 +43,18 @@ public class ItemPackage extends Item {
 	@Override
 	public TypedActionResult<ItemStack> use(World world, PlayerEntity user, Hand hand) {
 		ItemStack is = user.getStackInHand(hand);
+		ItemStack inside = contents(is);
+		if (inside.isEmpty()) {
+			return TypedActionResult.fail(is);
+		}
+		if (is.getCount() == 1) {
+			// The last package: the item takes its place in the hand. (Handing it out and
+			// returning the used-up package made Minecraft clear the slot the item went into.)
+			return TypedActionResult.success(inside, world.isClient);
+		}
+		is.decrement(1);
 		if (!world.isClient) {
-			ItemStack inside = contents(is);
-			if (!inside.isEmpty()) {
-				is.decrement(1);
-				user.inventory.offerOrDrop(world, inside);
-			}
+			user.inventory.offerOrDrop(world, inside);
 		}
 		return TypedActionResult.success(is, world.isClient);
 	}

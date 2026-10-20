@@ -29,6 +29,9 @@ public final class HardwareNbt {
 			c.putLong("Hz", s.cpu.hz);
 			c.putDouble("Multi", s.cpu.multi);
 			c.putString("Name", s.cpu.name);
+			if (!s.cpu.fpu.isEmpty()) {
+				c.putString("Fpu", s.cpu.fpu);
+			}
 			t.put("Cpu", c);
 		}
 		int[] ram = new int[s.ramKb.size()];
@@ -52,9 +55,7 @@ public final class HardwareNbt {
 		t.put("Cdroms", parts(s.cdroms));
 		ListTag disks = new ListTag();
 		for (DiskPart d : s.hardDisks) {
-			CompoundTag dt = new CompoundTag();
-			dt.putString("File", d.file);
-			dt.putInt("SizeMb", d.sizeMb);
+			CompoundTag dt = diskToTag(d);
 			if (!d.customName.isEmpty()) {
 				dt.putString("CustomName", d.customName);
 			}
@@ -76,7 +77,7 @@ public final class HardwareNbt {
 		}
 		if (t.contains("Cpu", TAG_COMPOUND)) {
 			CompoundTag c = t.getCompound("Cpu");
-			s.cpu = new CpuPart(c.getString("Family"), c.getLong("Hz"), c.getDouble("Multi"), c.getString("Name"));
+			s.cpu = new CpuPart(c.getString("Family"), c.getLong("Hz"), c.getDouble("Multi"), c.getString("Name"), c.getString("Fpu"));
 		}
 		for (int kb : t.getIntArray("RamKb")) {
 			if (kb > 0) {
@@ -96,7 +97,7 @@ public final class HardwareNbt {
 		ListTag disks = t.getList("HardDisks", TAG_COMPOUND);
 		for (int i = 0; i < disks.size(); i++) {
 			CompoundTag dt = disks.getCompound(i);
-			s.hardDisks.add(new DiskPart(dt.getString("File"), dt.getInt("SizeMb"), dt.getString("CustomName")));
+			s.hardDisks.add(tagToDisk(dt, dt.getString("CustomName")));
 		}
 		ListTag fi = t.getList("FloppyImages", TAG_STRING);
 		for (int i = 0; i < fi.size(); i++) {
@@ -130,15 +131,45 @@ public final class HardwareNbt {
 		return m;
 	}
 
-	private static CompoundTag partToTag(Part p) {
+	/** A hard disk's file, size, geometry, model and format (used by the PC and the Hard Drive item). */
+	public static CompoundTag diskToTag(DiskPart d) {
+		CompoundTag dt = new CompoundTag();
+		dt.putString("File", d.file);
+		dt.putInt("SizeMb", d.sizeMb);
+		if (d.hasGeometry()) {
+			dt.putInt("Cyl", d.cylinders);
+			dt.putInt("Heads", d.heads);
+			dt.putInt("Spt", d.sectors);
+		}
+		if (!d.model.isEmpty()) {
+			dt.putString("Model", d.model);
+		}
+		if (!DiskPart.RAW.equals(d.format)) {
+			dt.putString("Format", d.format);
+		}
+		if (!d.parent.isEmpty()) {
+			dt.putString("Parent", d.parent);
+		}
+		return dt;
+	}
+
+	public static DiskPart tagToDisk(CompoundTag dt, String customName) {
+		return new DiskPart(dt.getString("File"), dt.getInt("SizeMb"), customName, dt.getInt("Cyl"), dt.getInt("Heads"),
+				dt.getInt("Spt"), dt.getString("Model"), dt.getString("Format"), dt.getString("Parent"));
+	}
+
+	public static CompoundTag partToTag(Part p) {
 		CompoundTag t = new CompoundTag();
 		t.putString("Id", p.id);
 		t.putString("Name", p.name);
+		if (!p.options.isEmpty()) {
+			t.put("Options", optionsToTag(p.options));
+		}
 		return t;
 	}
 
-	private static Part tagToPart(CompoundTag t) {
-		return new Part(t.getString("Id"), t.getString("Name"));
+	public static Part tagToPart(CompoundTag t) {
+		return new Part(t.getString("Id"), t.getString("Name"), tagToOptions(t.getCompound("Options")));
 	}
 
 	private static ListTag parts(java.util.List<Part> list) {

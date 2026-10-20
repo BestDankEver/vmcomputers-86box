@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Locale;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import mcvmcomputers.client.ClientMod;
@@ -52,17 +53,20 @@ public class GuiPartsCatalog extends Screen {
 		final String name;
 		final String detail;
 		final Supplier<ItemStack> make;
-		/** A card with settings to pick before it goes in the cart, and the ones this entry starts with. */
-		final Card configurable;
-		final Map<String, String> preset;
+		/** Parts with settings: the settings screen's sections, the values this entry starts with, and how to make the item. */
+		List<GuiOptions.Section> sections;
+		Map<String, String> preset;
+		Function<Map<String, String>, ItemStack> makeWith;
 		int price = -1;
 
-		Entry(String name, String detail, Supplier<ItemStack> make, Card configurable, Map<String, String> preset) {
+		Entry(String name, String detail, Supplier<ItemStack> make) {
 			this.name = name;
 			this.detail = detail;
 			this.make = make;
-			this.configurable = configurable;
-			this.preset = preset;
+		}
+
+		boolean configurable() {
+			return sections != null;
 		}
 
 		int price() {
@@ -139,20 +143,23 @@ public class GuiPartsCatalog extends Screen {
 		switch (tab) {
 		case BOARDS:
 			for (Machine m : cat.machines) {
-				add(m.name, cat.machineTypeName(m.type) + "  RAM " + HardwareSpec.ramLabel(m.ramMinKb) + "-" + HardwareSpec.ramLabel(m.ramMaxKb),
+				Entry e = add(m.name, cat.machineTypeName(m.type) + "  RAM " + HardwareSpec.ramLabel(m.ramMinKb) + "-" + HardwareSpec.ramLabel(m.ramMaxKb),
 						() -> ItemPart.motherboard(m), q);
+				if (e != null && !m.settings.isEmpty()) {
+					e.sections = GuiOptions.groups(m.settings);
+					e.makeWith = v -> ItemPart.motherboard(m, v);
+				}
 			}
 			break;
 		case CPUS:
 			if (fit) {
 				for (CpuChoice c : cat.cpusFor(target)) {
-					add(c.displayName(), lang.get("mcvmcomputers.catalog.multiplier") + " " + c.model.multi + "x", () -> ItemPart.cpu(c.family, c.model), q);
+					cpuEntry(c.family, c.model, q);
 				}
 			} else {
 				for (CpuFamily f : cat.cpuFamilies) {
 					for (CpuModel c : f.cpus) {
-						add(f.displayName() + " " + c.speedLabel(), lang.get("mcvmcomputers.catalog.multiplier") + " " + c.multi + "x",
-								() -> ItemPart.cpu(f, c), q);
+						cpuEntry(f, c, q);
 					}
 				}
 			}
@@ -204,25 +211,61 @@ public class GuiPartsCatalog extends Screen {
 			}
 			String detail = lang.get("mcvmcomputers.part.card." + c.key);
 			Catalog.CardOption models = card.variantOption();
-			if (models == null) {
-				add(card.name, detail, () -> ItemPart.card(card), q, card.options.isEmpty() ? null : card, null);
+			if (c != CardCategory.ACCEL || models == null) {
+				cardEntry(card, card.name, detail, null, q);
 				continue;
 			}
-			// One entry per model, e.g. Voodoo Graphics and Voodoo 2 from the one Voodoo device.
+			// Add-ons: one entry per model, e.g. Voodoo Graphics and Voodoo 2 from the one Voodoo device.
 			for (Catalog.OptionChoice v : models.choices) {
 				Map<String, String> preset = Collections.singletonMap(models.name, v.value);
-				add(card.displayName(preset), detail, () -> ItemPart.card(card, preset), q, card, preset);
+				cardEntry(card, card.displayName(preset), detail, preset, q);
 			}
 		}
 	}
 
-	private void add(String name, String detail, Supplier<ItemStack> make, String q) {
-		add(name, detail, make, q, null, null);
+	private void cardEntry(Card card, String name, String detail, Map<String, String> preset, String q) {
+		Entry e = add(name, detail, () -> ItemPart.card(card, preset), q);
+		if (e != null && !card.settings.isEmpty()) {
+			e.sections = GuiOptions.single(card.settings);
+			e.preset = preset;
+			e.makeWith = v -> ItemPart.card(card, v);
+		}
 	}
 
-	private void add(String name, String detail, Supplier<ItemStack> make, String q, Card configurable, Map<String, String> preset) {
+	private void cpuEntry(CpuFamily f, CpuModel c, String q) {
+		Entry e = add(f.displayName() + " " + c.speedLabel(), lang.get("mcvmcomputers.catalog.multiplier") + " " + c.multi + "x",
+				() -> ItemPart.cpu(f, c), q);
+		if (e != null && !c.fpu.isEmpty()) {
+			e.sections = GuiOptions.single(c.fpu);
+			e.makeWith = v -> ItemPart.cpu(f, c, v.get(CpuModel.FPU_KEY));
+		}
+	}
+
+	/** Adds an entry if it matches the search; returns it so settings can be attached. */
+	private Entry add(String name, String detail, Supplier<ItemStack> make, String q) {
 		if (q.isEmpty() || name.toLowerCase(Locale.ROOT).contains(q) || detail.toLowerCase(Locale.ROOT).contains(q)) {
-			entries.add(new Entry(name, detail, make, configurable, preset));
+			Entry e = new Entry(name, detail, make);
+			entries.add(e);
+			return e;
+		}
+		return null;
+	}
+
+	private void openSetup(Entry e) {
+		MinecraftClient.getInstance().openScreen(new GuiOptions(this, e.sections, e.preset,
+				v -> e.makeWith.apply(v).getName().getString(),
+				v -> lang.get("mcvmcomputers.card_options.add").replace("%s", "" + PartPricing.price(e.makeWith.apply(v))),
+				v -> {
+					ItemStack s = e.makeWith.apply(v);
+					addToCart(s, s.getName().getString());
+					afterAdd(s);
+				}));
+	}
+
+	private void afterAdd(ItemStack s) {
+		if (s.getItem() == ItemList.ITEM_MOTHERBOARD) {
+			buildEntries(); // the new board becomes what "fits" means
+			rebuildRows();
 		}
 	}
 
@@ -317,29 +360,28 @@ public class GuiPartsCatalog extends Screen {
 		int y = listTop();
 		for (int i = scroll; i < Math.min(entries.size(), scroll + rowsVisible()); i++) {
 			Entry e = entries.get(i);
-			int priceX = this.width - 120;
-			labels.add(new Object[] { 10, y + 3, 0xffffff, this.textRenderer.trimToWidth(e.name, Math.max(60, priceX - 220)) });
+			int priceX = this.width - 150;
+			int nameW = Math.max(60, (priceX - 16) * 3 / 5);
+			labels.add(new Object[] { 10, y + 3, 0xffffff, this.textRenderer.trimToWidth(e.name, nameW) });
 			if (!e.detail.isEmpty()) {
-				labels.add(new Object[] { Math.max(70, priceX - 200), y + 3, 0x888888, this.textRenderer.trimToWidth(e.detail, 190) });
+				int detailX = 10 + nameW + 6;
+				labels.add(new Object[] { detailX, y + 3, 0x888888, this.textRenderer.trimToWidth(e.detail, Math.max(0, priceX - detailX - 6)) });
 			}
-			String price = lang.get("mcvmcomputers.catalog.price").replace("%s", "" + e.price());
-			labels.add(new Object[] { priceX, y + 3, 0xdddddd, e.configurable == null ? price : price + "+" });
-			String addLabel = lang.get(e.configurable == null ? "mcvmcomputers.catalog.add" : "mcvmcomputers.catalog.configure");
-			this.addButton(new ButtonWidget(this.width - 52, y, 46, 13, new LiteralText(addLabel), b -> {
+			labels.add(new Object[] { priceX, y + 3, 0xdddddd, lang.get("mcvmcomputers.catalog.price").replace("%s", "" + e.price()) });
+			if (e.configurable()) {
+				this.addButton(new ButtonWidget(this.width - 100, y, 46, 13, new LiteralText(lang.get("mcvmcomputers.catalog.configure")), b -> {
+					if (ClientMod.tabletOS != null) {
+						openSetup(e);
+					}
+				}));
+			}
+			this.addButton(new ButtonWidget(this.width - 52, y, 46, 13, new LiteralText(lang.get("mcvmcomputers.catalog.add")), b -> {
 				if (ClientMod.tabletOS == null) {
 					return;
 				}
-				if (e.configurable != null) {
-					MinecraftClient.getInstance().openScreen(new GuiCardOptions(this, e.configurable, e.preset,
-							s -> addToCart(s, s.getName().getString())));
-					return;
-				}
 				ItemStack s = e.make.get();
-				addToCart(s, e.name);
-				if (s.getItem() == ItemList.ITEM_MOTHERBOARD) {
-					buildEntries(); // the new board becomes what "fits" means
-					rebuildRows();
-				}
+				addToCart(s, s.getName().getString());
+				afterAdd(s);
 			}));
 			y += ROW;
 		}

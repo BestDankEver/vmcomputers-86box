@@ -97,7 +97,19 @@ public class ItemPart extends OrderableItem {
 				if (m.onboardSound != null) {
 					tooltip.add(new TranslatableText("mcvmcomputers.part.onboard", m.onboardSound).formatted(Formatting.DARK_GRAY));
 				}
+				String summary = Catalog.SettingsGroup.summaryAll(m.settings, HardwareNbt.tagToOptions(p.getCompound("Options")));
+				if (!summary.isEmpty()) {
+					tooltip.add(new LiteralText(summary).formatted(Formatting.GRAY));
+				}
 			}
+		}
+		if (kind == Kind.CPU && !p.getString("Fpu").isEmpty()) {
+			String fpu = p.getString("Fpu");
+			CpuModel cm = cat == null ? null : cat.cpuModel(p.getString("Family"), p.getLong("Hz"), p.getDouble("Multi"));
+			if (cm != null && !cm.fpu.isEmpty()) {
+				fpu = Catalog.OptionSet.valueLabel(cm.fpu.options.get(0), fpu);
+			}
+			tooltip.add(new LiteralText("Math coprocessor: " + fpu).formatted(Formatting.GRAY));
 		}
 		if (kind == Kind.CARD && p.contains("Options", 10)) {
 			Map<String, String> opts = HardwareNbt.tagToOptions(p.getCompound("Options"));
@@ -145,19 +157,37 @@ public class ItemPart extends OrderableItem {
 	}
 
 	public static ItemStack motherboard(Machine m) {
+		return motherboard(m, null);
+	}
+
+	/** A motherboard with its settings (BIOS version, built-in chips), checked against the catalog. */
+	public static ItemStack motherboard(Machine m, Map<String, String> options) {
 		CompoundTag t = new CompoundTag();
 		t.putString("Id", m.id);
 		t.putString("Name", m.name);
 		t.putInt("Type", m.type);
+		if (!m.settings.isEmpty()) {
+			t.put("Options", HardwareNbt.optionsToTag(Catalog.SettingsGroup.resolveAll(m.settings, options)));
+		}
 		return make(ItemList.ITEM_MOTHERBOARD, t);
 	}
 
 	public static ItemStack cpu(CpuFamily f, CpuModel c) {
+		return cpu(f, c, null);
+	}
+
+	public static ItemStack cpu(CpuFamily f, CpuModel c, String fpu) {
 		CompoundTag t = new CompoundTag();
 		t.putString("Family", f.id);
 		t.putLong("Hz", c.hz);
 		t.putDouble("Multi", c.multi);
 		t.putString("Name", f.displayName() + " " + c.speedLabel());
+		if (!c.fpu.isEmpty()) {
+			String v = c.fpu.resolve(fpu == null ? null : java.util.Collections.singletonMap(CpuModel.FPU_KEY, fpu)).get(CpuModel.FPU_KEY);
+			if (v != null && !v.isEmpty() && !v.equals("none")) {
+				t.putString("Fpu", v);
+			}
+		}
 		return make(ItemList.ITEM_CPU, t);
 	}
 
@@ -202,9 +232,7 @@ public class ItemPart extends OrderableItem {
 
 	/** Back from installed parts to items, for removing parts from a PC. */
 	public static ItemStack fromPart(Kind kind, Part p) {
-		CompoundTag t = new CompoundTag();
-		t.putString("Id", p.id);
-		t.putString("Name", p.name);
+		CompoundTag t = HardwareNbt.partToTag(p);
 		ItemPart item = kind == Kind.MOTHERBOARD ? ItemList.ITEM_MOTHERBOARD
 				: kind == Kind.FLOPPY_DRIVE ? ItemList.ITEM_FLOPPY_DRIVE : ItemList.ITEM_CDROM_DRIVE;
 		return make(item, t);
@@ -216,6 +244,9 @@ public class ItemPart extends OrderableItem {
 		t.putLong("Hz", c.hz);
 		t.putDouble("Multi", c.multi);
 		t.putString("Name", c.name);
+		if (!c.fpu.isEmpty()) {
+			t.putString("Fpu", c.fpu);
+		}
 		return make(ItemList.ITEM_CPU, t);
 	}
 
@@ -232,12 +263,12 @@ public class ItemPart extends OrderableItem {
 
 	public static Part toPart(ItemStack s) {
 		CompoundTag t = partTag(s);
-		return t == null ? null : new Part(t.getString("Id"), t.getString("Name"));
+		return t == null ? null : HardwareNbt.tagToPart(t);
 	}
 
 	public static CpuPart toCpu(ItemStack s) {
 		CompoundTag t = partTag(s);
-		return t == null ? null : new CpuPart(t.getString("Family"), t.getLong("Hz"), t.getDouble("Multi"), t.getString("Name"));
+		return t == null ? null : new CpuPart(t.getString("Family"), t.getLong("Hz"), t.getDouble("Multi"), t.getString("Name"), t.getString("Fpu"));
 	}
 
 	public static CardPart toCard(ItemStack s) {

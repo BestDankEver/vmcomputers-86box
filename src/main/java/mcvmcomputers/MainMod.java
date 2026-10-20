@@ -158,14 +158,20 @@ public class MainMod implements ModInitializer {
 		ServerPlayNetworking.registerGlobalReceiver(C2S_CHANGE_HDD, (server, player, handler, buf, sender) -> {
 			String file = buf.readString(256);
 			int sizeMb = buf.readInt();
+			int cyl = buf.readInt();
+			int heads = buf.readInt();
+			int spt = buf.readInt();
+			String model = buf.readString(64);
+			String format = buf.readString(16);
+			String parent = buf.readString(256);
 			server.execute(() -> {
-				if (!safeFileName(file)) {
+				if (!safeFileName(file) || (!parent.isEmpty() && !safeFileName(parent))) {
 					return;
 				}
 				ItemStack held = player.getMainHandStack();
 				if (held.getItem() instanceof ItemHarddrive) {
-					held.getOrCreateTag().putString("vhdfile", file);
-					held.getOrCreateTag().putInt("SizeMb", Math.max(1, sizeMb));
+					ItemHarddrive.setDisk(held, new DiskPart(file, Math.max(1, sizeMb), "", Math.min(cyl, 266305), Math.min(heads, 255),
+							Math.min(spt, 255), model, format, parent));
 				}
 			});
 		});
@@ -181,6 +187,22 @@ public class MainMod implements ModInitializer {
 			int kind = buf.readInt();
 			int index = buf.readInt();
 			server.execute(() -> removePart(player, id, kind, index));
+		});
+
+		ServerPlayNetworking.registerGlobalReceiver(C2S_CONFIGURE_PART, (server, player, handler, buf, sender) -> {
+			int id = buf.readInt();
+			int slot = buf.readInt();
+			int index = buf.readInt();
+			String name = buf.readString(128);
+			int n = buf.readInt();
+			if (n < 0 || n > 128) {
+				return;
+			}
+			java.util.Map<String, String> options = new java.util.LinkedHashMap<>();
+			for (int i = 0; i < n; i++) {
+				options.put(buf.readString(64), buf.readString(64));
+			}
+			server.execute(() -> configurePart(player, id, slot, index, name, options));
 		});
 
 		ServerPlayNetworking.registerGlobalReceiver(C2S_SET_MEDIA, (server, player, handler, buf, sender) -> {
@@ -300,7 +322,7 @@ public class MainMod implements ModInitializer {
 					dup |= d.file.equals(file);
 				}
 				if (!dup) {
-					s.hardDisks.add(new DiskPart(file, ItemHarddrive.sizeOf(stack), ItemHarddrive.customNameOf(stack)));
+					s.hardDisks.add(ItemHarddrive.toDisk(stack));
 					ok = true;
 				}
 			}
@@ -309,6 +331,55 @@ public class MainMod implements ModInitializer {
 			stack.decrement(1);
 			pc.setHardware(s);
 		}
+	}
+
+	/**
+	 * New settings for an installed part. The values are only stored here; the
+	 * PC owner's game checks them against its catalog when it writes the 86Box
+	 * config, so nothing invalid reaches 86Box.
+	 */
+	private static void configurePart(ServerPlayerEntity player, int entityId, int slot, int index, String name,
+			java.util.Map<String, String> options) {
+		EntityPC pc = ownedPc(player, entityId);
+		if (pc == null) {
+			return;
+		}
+		if (isRunning(pc)) {
+			deny(player, "mcvmcomputers.turn_off_first");
+			return;
+		}
+		HardwareSpec s = pc.copyHardware();
+		switch (slot) {
+		case SLOT_MOTHERBOARD:
+			if (s.motherboard == null) {
+				return;
+			}
+			s.motherboard = new HardwareSpec.Part(s.motherboard.id, s.motherboard.name, options);
+			break;
+		case SLOT_CPU:
+			if (s.cpu == null) {
+				return;
+			}
+			String fpu = options.getOrDefault("fpu_type", "");
+			s.cpu = new HardwareSpec.CpuPart(s.cpu.family, s.cpu.hz, s.cpu.multi, s.cpu.name, "none".equals(fpu) ? "" : fpu);
+			break;
+		case SLOT_CARD:
+			if (index < 0 || index >= s.cards.size()) {
+				return;
+			}
+			CardPart c = s.cards.get(index);
+			s.cards.set(index, new CardPart(c.category, c.id, name.isEmpty() ? c.name : name, options));
+			break;
+		case SLOT_HDD:
+			if (index < 0 || index >= s.hardDisks.size()) {
+				return;
+			}
+			s.hardDisks.set(index, s.hardDisks.get(index).withModel(options.getOrDefault("model", "")));
+			break;
+		default:
+			return;
+		}
+		pc.setHardware(s);
 	}
 
 	private static void removePart(ServerPlayerEntity player, int entityId, int kind, int index) {
@@ -376,7 +447,7 @@ public class MainMod implements ModInitializer {
 		case SLOT_HDD:
 			if (index >= 0 && index < s.hardDisks.size()) {
 				DiskPart d = s.hardDisks.remove(index);
-				give(player, ItemHarddrive.createHardDrive(d.file, d.sizeMb, d.customName));
+				give(player, ItemHarddrive.fromDisk(d));
 			}
 			break;
 		default:

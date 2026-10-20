@@ -154,6 +154,9 @@ public final class ConfigWriter {
 			ini.set("Machine", "cpu_speed", Long.toString(spec.cpu.hz));
 			ini.set("Machine", "cpu_multi", multi(spec.cpu.multi));
 		}
+		if (spec.cpu != null && !spec.cpu.fpu.isEmpty()) {
+			ini.set("Machine", "fpu_type", spec.cpu.fpu);
+		}
 		ini.set("Machine", "cpu_use_dynarec", "1");
 		ini.set("Machine", "time_sync", "local");
 		int ram = spec.totalRamKb();
@@ -191,11 +194,6 @@ public final class ConfigWriter {
 				continue;
 			}
 			ini.set("Video", card.configKey, "1");
-			if (card.section != null) {
-				for (Map.Entry<String, String> e : card.resolve(c.options).entrySet()) {
-					ini.set(card.section, e.getKey(), e.getValue());
-				}
-			}
 		}
 
 		// Sound: up to four cards; the board's own sound when there are none.
@@ -247,10 +245,24 @@ public final class ConfigWriter {
 		int pos = 0;
 		for (int i = 0; i < spec.hardDisks.size() && pos < HardwareSpec.MAX_IDE_DEVICES; i++, pos++) {
 			DiskPart d = spec.hardDisks.get(i);
-			int[] g = geometry(d.sizeMb, bus);
+			int[] g = d.hasGeometry() ? new int[] { d.sectors, d.heads, d.cylinders } : geometry(d.sizeMb, bus);
 			String n = String.format(Locale.ROOT, "hdd_%02d_", i + 1);
 			ini.set("Hard disks", n + "parameters", g[0] + ", " + g[1] + ", " + g[2] + ", 0, " + bus);
-			ini.set("Hard disks", n + "fn", new File(folders.hardDisks, d.file).getAbsolutePath());
+			File image = new File(folders.hardDisks, d.file);
+			ini.set("Hard disks", n + "fn", image.getAbsolutePath());
+			if (!d.model.isEmpty()) {
+				ini.set("Hard disks", n + "speed", d.model);
+			}
+			// A disk that doesn't exist yet is created by 86Box when it starts, in this format.
+			// (An existing VHD keeps its own geometry and type.)
+			if (!image.exists()) {
+				if (HardwareSpec.DiskPart.VHD_DYNAMIC.equals(d.format) || HardwareSpec.DiskPart.VHD_DIFF.equals(d.format)) {
+					ini.set("Hard disks", n + "vhd_blocksize", "4096");
+				}
+				if (HardwareSpec.DiskPart.VHD_DIFF.equals(d.format) && !d.parent.isEmpty()) {
+					ini.set("Hard disks", n + "vhd_parent", new File(folders.hardDisks, d.parent).getAbsolutePath());
+				}
+			}
 			switch (bus) {
 			case "ide":
 				ini.set("Hard disks", n + "ide_channel", (pos >> 1) + ":" + (pos & 1));
@@ -298,6 +310,24 @@ public final class ConfigWriter {
 				}
 			} else {
 				ini.set("Floppy and CD-ROM drives", n + "type", "none");
+			}
+		}
+
+		// Settings from each part's Configure dialog, in sections named after the device
+		// (written last so they don't split the sections above).
+		if (m != null && spec.motherboard != null) {
+			for (Catalog.SettingsGroup g : m.settings) {
+				for (Map.Entry<String, String> e : g.set.resolve(g.pick(spec.motherboard.options)).entrySet()) {
+					ini.set(g.section, e.getKey(), e.getValue());
+				}
+			}
+		}
+		for (CardPart c : spec.cards) {
+			Card card = cat == null ? null : cat.card(c.category, c.id);
+			if (card != null && card.section != null && !card.settings.isEmpty()) {
+				for (Map.Entry<String, String> e : card.resolve(c.options).entrySet()) {
+					ini.set(card.section, e.getKey(), e.getValue());
+				}
 			}
 		}
 
