@@ -1,0 +1,213 @@
+# Nightly 86Box for VM Computers 86Box.
+#
+# Builds the newest 86Box master, unmodified, with one build switch turned on
+# (-D AUTOMATION=ON, the control socket the mod talks to; official builds have
+# it off). Alongside it, generates catalog.json, the list of machines, CPUs and
+# cards the in-game shop sells, from the same 86Box commit and ROM set.
+#
+# The mod reads releases/latest/download/manifest.json from this repository,
+# so a new 86Box reaches players without a mod update.
+
+name: 86Box nightly
+
+on:
+  schedule:
+    - cron: "17 6 * * *"   # every day, 06:17 UTC
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Build even if 86Box hasn't changed"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: 86box-nightly
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Look for a new 86Box commit
+    runs-on: ubuntu-24.04
+    outputs:
+      build: ${{ steps.decide.outputs.build }}
+      emu_sha: ${{ steps.heads.outputs.emu_sha }}
+      roms_sha: ${{ steps.heads.outputs.roms_sha }}
+    steps:
+      - id: heads
+        name: Read 86Box and ROM set heads
+        run: |
+          emu_sha=$(git ls-remote https://github.com/86Box/86Box.git refs/heads/master | cut -f1)
+          roms_sha=$(git ls-remote https://github.com/86Box/roms.git refs/heads/master | cut -f1)
+          echo "emu_sha=$emu_sha" >> "$GITHUB_OUTPUT"
+          echo "roms_sha=$roms_sha" >> "$GITHUB_OUTPUT"
+          echo "86Box $emu_sha, roms $roms_sha"
+      - id: decide
+        name: Compare with the latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ inputs.force }}" = "true" ]; then echo "build=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          prev=$(gh release download --repo "$GITHUB_REPOSITORY" --pattern manifest.json --output - 2>/dev/null || echo '{}')
+          prev_emu=$(echo "$prev" | jq -r '.emulator_git_hash // ""')
+          prev_roms=$(echo "$prev" | jq -r '.roms_git_hash // ""')
+          if [ "$prev_emu" = "${{ steps.heads.outputs.emu_sha }}" ] && [ "$prev_roms" = "${{ steps.heads.outputs.roms_sha }}" ]; then
+            echo "Nothing new."
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  windows:
+    name: 86Box for Windows x64
+    needs: check
+    if: needs.check.outputs.build == 'true'
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: msys2/setup-msys2@v2
+        with:
+          release: true
+          update: true
+          msystem: UCRT64
+          install: zip
+          pacboy: >-
+            ninja:p cmake:p gcc:p pkgconf:p freetype:p sdl3:p zlib:p libpng:p
+            openal:p rtmidi:p libslirp:p fluidsynth:p libserialport:p libsndfile:p
+            qt5-static:p vulkan-headers:p llvm-openmp:p zstd:p ntldd:p
+      - name: Check out 86Box
+        uses: actions/checkout@v4
+        with:
+          repository: 86Box/86Box
+          ref: ${{ needs.check.outputs.emu_sha }}
+          path: 86Box
+      - name: Configure
+        working-directory: 86Box
+        run: >-
+          cmake -S . -B build --preset regular
+          -D QT=ON -D AUTOMATION=ON
+          -D "EMU_BUILD=VM Computers nightly ${{ github.run_number }}"
+          -D "EMU_GIT_HASH=$(echo ${{ needs.check.outputs.emu_sha }} | cut -c1-8)"
+      - name: Build
+        working-directory: 86Box
+        run: cmake --build build
+      - name: Install
+        working-directory: 86Box
+        run: cmake --install build
+      - name: Collect DLLs
+        working-directory: 86Box
+        run: |
+          exe=$(find build/artifacts -name 86Box.exe | head -1)
+          dir=$(dirname "$exe")
+          # Copy every MSYS2 DLL the executable needs next to it, recursively.
+          for pass in 1 2 3; do
+            for f in "$dir"/*.exe "$dir"/*.dll; do
+              [ -e "$f" ] || continue
+              ntldd -R "$f" | grep -i ucrt64 | sed -E 's/.* => ([^ ]+) .*/\1/' | tr '\\' '/' | while read -r dll; do
+                dll=$(cygpath -u "$dll")
+                [ -e "$dir/$(basename "$dll")" ] || cp "$dll" "$dir/"
+              done
+            done
+          done
+          ls -la "$dir"
+          mkdir -p ../out
+          (cd "$dir" && zip -r -9 "$GITHUB_WORKSPACE/out/86Box-Windows-x64.zip" .)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: out/86Box-Windows-x64.zip
+
+  catalog:
+    name: Parts catalog
+    needs: check
+    if: needs.check.outputs.build == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: repo
+      - name: Check out 86Box
+        uses: actions/checkout@v4
+        with:
+          repository: 86Box/86Box
+          ref: ${{ needs.check.outputs.emu_sha }}
+          path: 86Box
+      - name: Check out the ROM set
+        uses: actions/checkout@v4
+        with:
+          repository: 86Box/roms
+          ref: ${{ needs.check.outputs.roms_sha }}
+          path: roms
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ninja-build cmake pkg-config \
+            qtbase5-dev qtbase5-private-dev qttools5-dev qttools5-dev-tools libqt5opengl5-dev \
+            extra-cmake-modules libwayland-dev wayland-protocols libxkbcommon-dev libxi-dev \
+            libsdl2-dev libopenal-dev libslirp-dev librtmidi-dev libsndfile1-dev libevdev-dev \
+            libserialport-dev libfreetype-dev libpng-dev zlib1g-dev libzstd-dev
+      - name: Build 86Box objects
+        working-directory: 86Box
+        run: |
+          cmake -G Ninja -S . -B build -D CMAKE_BUILD_TYPE=Release -D QT=ON -D USE_QT6=OFF -D SDL2=ON \
+                -D AUTOMATION=ON -D MUNT=OFF -D FLUIDSYNTH=OFF
+          ninja -C build
+      - name: Build and run the catalog tool
+        run: |
+          repo/tools/catalog/build.sh 86Box 86Box/build ./86box-catalog
+          mkdir -p out
+          ./86box-catalog roms out/catalog.json ${{ needs.check.outputs.emu_sha }}
+          python3 -c "import json; d=json.load(open('out/catalog.json')); print(len(d['machines']), 'machines')"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: catalog
+          path: out/catalog.json
+
+  release:
+    name: Publish
+    needs: [check, windows, catalog]
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dl
+          merge-multiple: true
+      - name: Write manifest
+        run: |
+          cd dl
+          emu_version=$(jq -r .emulator_version catalog.json)
+          tag="86box-$(date -u +%Y%m%d)-$(echo ${{ needs.check.outputs.emu_sha }} | cut -c1-8)"
+          echo "TAG=$tag" >> "$GITHUB_ENV"
+          base="https://github.com/$GITHUB_REPOSITORY/releases/download/$tag"
+          jq -n \
+            --arg tag "$tag" \
+            --arg emu "${{ needs.check.outputs.emu_sha }}" \
+            --arg roms "${{ needs.check.outputs.roms_sha }}" \
+            --arg ver "$emu_version" \
+            --arg built "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg win_url "$base/86Box-Windows-x64.zip" \
+            --arg win_sha "$(sha256sum 86Box-Windows-x64.zip | cut -d' ' -f1)" \
+            --arg cat_url "$base/catalog.json" \
+            --arg cat_sha "$(sha256sum catalog.json | cut -d' ' -f1)" \
+            '{format: 1, tag: $tag, emulator_version: $ver, emulator_git_hash: $emu, roms_git_hash: $roms, built: $built,
+              roms_url: ("https://codeload.github.com/86Box/roms/zip/" + $roms),
+              windows_x64: {url: $win_url, sha256: $win_sha},
+              catalog: {url: $cat_url, sha256: $cat_sha}}' > manifest.json
+          cat manifest.json
+      - name: Create release
+        run: |
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --latest \
+            --title "86Box nightly $TAG" \
+            --notes "86Box master ${{ needs.check.outputs.emu_sha }} with the automation socket on, ROM set ${{ needs.check.outputs.roms_sha }}." \
+            dl/86Box-Windows-x64.zip dl/catalog.json dl/manifest.json
+      - name: Keep the last 14 nightlies
+        run: |
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 200 --json tagName \
+            | jq -r '.[].tagName' | grep '^86box-' | sort -r | tail -n +15 \
+            | while read -r t; do gh release delete "$t" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag; done
