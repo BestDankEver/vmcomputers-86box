@@ -11,6 +11,9 @@
 name: 86Box nightly
 
 on:
+  push:
+    paths:
+      - .github/workflows/86box-nightly.yml
   schedule:
     - cron: "17 6 * * *"   # every day, 06:17 UTC
   workflow_dispatch:
