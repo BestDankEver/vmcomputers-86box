@@ -1,7 +1,7 @@
 {
 	"credit": "Made with Blockbench",
 	"textures": {
-		"0": "mcvmcomputers:screen_placeholder",
+		"0": "mcvmcomputers:item/screen_placeholder",
 		"2": "mcvmcomputers:item/flatscreen/screen_r",
 		"3": "mcvmcomputers:item/flatscreen/screen_u",
 		"4": "mcvmcomputers:item/flatscreen/screen_d",
@@ -10,7 +10,7 @@
 		"7": "mcvmcomputers:item/flatscreen/screen_stand1",
 		"8": "mcvmcomputers:item/flatscreen/screen_stand0",
 		"9": "mcvmcomputers:item/flatscreen/screen_l",
-		"particle": "mcvmcomputers:screen_placeholder"
+		"particle": "mcvmcomputers:item/screen_placeholder"
 	},
 	"elements": [
 		{
