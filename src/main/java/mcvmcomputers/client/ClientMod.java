@@ -81,6 +81,7 @@ public class ClientMod implements ClientModInitializer {
 	public static EntityPC currentPC;
 
 	public static VMSettings settings;
+	private static boolean setupOpened;
 	public static Installer installer;
 
 	/** The VM this player is running (one at a time). */
@@ -533,6 +534,22 @@ public class ClientMod implements ClientModInitializer {
 		};
 
 		registerClientPackets();
+
+		// First-time setup, shown over the title screen. If the game goes straight into a
+		// world (e.g. --quickPlay), the saved settings (or defaults) are used instead.
+		net.fabricmc.fabric.api.client.screen.v1.ScreenEvents.AFTER_INIT.register((client, screen, w, h) -> {
+			if (screen instanceof net.minecraft.client.gui.screen.TitleScreen && settings == null && !setupOpened) {
+				setupOpened = true;
+				client.send(() -> client.setScreen(new mcvmcomputers.client.gui.setup.GuiSetup()));
+			}
+		});
+		net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> client.execute(() -> {
+			if (settings == null) {
+				VMSettings saved = VMSettings.load();
+				applySettings(saved != null ? saved : new VMSettings());
+				startBackgroundUpdate();
+			}
+		}));
 
 		EntityRendererRegistry.register(EntityList.ITEM_PREVIEW, ItemPreviewRender::new);
 		EntityRendererRegistry.register(EntityList.KEYBOARD, KeyboardRender::new);

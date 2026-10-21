@@ -43,7 +43,8 @@ public class GameloopMixin {
 		vhdDirectory.mkdirs();
 		isoDirectory = new File(mcc.runDirectory, "vm_computers/isos");
 		isoDirectory.mkdirs();
-		mcc.setScreen(new GuiSetup());
+		// The setup screen opens with the title screen (see ClientMod): on 1.20 the
+		// title screen replaces anything set this early.
 	}
 
 	@Inject(at = @At("HEAD"), method = "render")

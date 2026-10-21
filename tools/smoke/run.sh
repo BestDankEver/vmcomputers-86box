@@ -35,8 +35,18 @@ echo "server: $(grep -c 'Done (' run-server/logs/latest.log 2>/dev/null) ready a
 Xvfb :99 -screen 0 1280x720x24 > /dev/null 2>&1 &
 export DISPLAY=:99
 sleep 2
-gradle runClient --args="--quickPlayMultiplayer localhost:25565" > out/client-console.log 2>&1 &
+REPO=-Pnightly_repo=BestDankEver/vmcomputers-86box
 shot() { import -display :99 -window root "out/$1.png" 2>/dev/null || true; }
+# 1) Plain start: the mod's setup screen should come up over the title screen.
+gradle runClient $REPO > out/client-console-title.log 2>&1 &
+sleep 60; shot s1-title-setup
+xdotool key Tab; sleep 1; shot s2-setup-tab
+pkill -f "net.fabricmc.devlaunchinjector" ; pkill -f KnotClient; sleep 8
+cp run/logs/latest.log out/client-title.log 2>/dev/null
+# 2) Straight into the server.
+gradle runClient $REPO --args="--quickPlayMultiplayer localhost:25565" > out/client-console.log 2>&1 &
+# GUI pixel (gui scale 2, 854x480 window at 213,120 on the 1280x720 display)
+click() { xdotool mousemove $((213 + $1 * 2)) $((120 + $2 * 2)); sleep 0.3; xdotool click 1; sleep 2; }
 key() { xdotool key "$@"; sleep 1.5; }
 for t in 40 60 80; do sleep 20; shot "t$t"; done
 rcon() { python3 tools/smoke/rcon.py "$@"; sleep 1; }
@@ -47,7 +57,7 @@ key 3
 rcon tp @p 0.5 -60 0.5 0 60
 xdotool click 3; sleep 2; shot b-placed
 xdotool click 3; sleep 3; shot c-pc-screen
-xdotool key Tab; sleep 1; shot c2-pc-screen-tab
+click 210 221; sleep 2; shot c2-open-case
 key Escape; shot d-after-escape
 rcon tp @p 0.5 -60 0.5 0 15
 key e; shot e-inventory
@@ -56,6 +66,9 @@ key Escape
 key 1; hold Return; sleep 3; shot f-tablet-enter
 hold Return; sleep 4; shot g-tablet-enter2
 hold Return; sleep 3; shot h-tablet-enter3
+xdotool type --delay 80 voodoo; sleep 2; shot i-catalog-voodoo
+click 350 70; sleep 2; shot j-voodoo-setup
+key Escape; key Escape
 sleep 5
 cp run/logs/latest.log out/client.log 2>/dev/null
 cp run-server/logs/latest.log out/server.log 2>/dev/null
