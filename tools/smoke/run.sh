@@ -58,6 +58,7 @@ rcon tp @p 0.5 -60 0.5 0 60
 xdotool click 3; sleep 2; shot b-placed
 xdotool click 3; sleep 3; shot c-pc-screen
 click 210 221; sleep 2; shot c2-open-case
+click 222 45; sleep 2; shot c3-install-picker
 key Escape; shot d-after-escape
 rcon tp @p 0.5 -60 0.5 0 15
 key e; shot e-inventory
@@ -66,6 +67,7 @@ key Escape
 key 1; hold Return; sleep 3; shot f-tablet-enter
 hold Return; sleep 4; shot g-tablet-enter2
 hold Return; sleep 3; shot h-tablet-enter3
+click 171 11; sleep 1
 xdotool type --delay 80 voodoo; sleep 2; shot i-catalog-voodoo
 click 350 70; sleep 2; shot j-voodoo-setup
 key Escape; key Escape
