@@ -13,6 +13,15 @@ base {
 repositories {
 }
 
+loom {
+	runs {
+		// Separate folders so a test server and client can run side by side.
+		server {
+			runDir "run-server"
+		}
+	}
+}
+
 dependencies {
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
 	mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
