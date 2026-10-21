@@ -59,6 +59,8 @@ xdotool click 3; sleep 2; shot b-placed
 xdotool click 3; sleep 3; shot c-pc-screen
 click 210 221; sleep 2; shot c2-open-case
 click 222 45; sleep 2; shot c3-install-picker
+click 332 45; sleep 3; shot c4-board-installed
+xdotool mousemove 900 400; xdotool click 5 5 5; sleep 1; shot c5-scrolled
 key Escape; shot d-after-escape
 rcon tp @p 0.5 -60 0.5 0 15
 key e; shot e-inventory
