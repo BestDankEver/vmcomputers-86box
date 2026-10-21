@@ -2,10 +2,9 @@
 #
 # Builds the newest 86Box master with one build switch turned on (-D
 # AUTOMATION=ON, the control socket the mod talks to; official builds have it
-# off) and the small patches in tools/86box-patches (audio over that socket, so
-# the game can play VM sound from the PC). If a patch stops applying to a newer
-# 86Box, the build goes ahead without it and the mod falls back to 86Box's own
-# sound. Alongside it, generates catalog.json, the list of machines, CPUs and
+# off) and the small patches in tools/86box-patches (starting without taking
+# the keyboard focus from the game). If a patch stops applying to a newer
+# 86Box, the build goes ahead without it (with a warning on the run). Alongside it, generates catalog.json, the list of machines, CPUs and
 # cards the in-game shop sells, from the same 86Box commit and ROM set.
 #
 # The mod reads releases/latest/download/manifest.json from this repository,
@@ -88,7 +87,7 @@ jobs:
           release: true
           update: true
           msystem: UCRT64
-          install: zip
+          install: zip git
           pacboy: >-
             ninja:p cmake:p gcc:p pkgconf:p freetype:p sdl3:p zlib:p libpng:p
             openal:p rtmidi:p libslirp:p fluidsynth:p libserialport:p libsndfile:p

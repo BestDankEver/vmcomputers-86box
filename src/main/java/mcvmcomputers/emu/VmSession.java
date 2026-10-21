@@ -71,10 +71,53 @@ public final class VmSession {
 		}
 	}
 
-	private static final int AUDIO_INTERVAL_MS = 25;
-	private static final int AUDIO_QUEUE_MAX = 200;
+	private static final int AUDIO_INTERVAL_MS = 30;
+	private static final int AUDIO_QUEUE_MAX = 300;
+	/** 86Box's output streams worth hearing (not the drive-noise ones, which need a sound pack). */
+	private static final String[] AUDIO_STREAMS = { "main", "music", "wavetable", "cd", "ym2151", "midi" };
 	private final ConcurrentLinkedQueue<AudioChunk> audio = new ConcurrentLinkedQueue<>();
 	private volatile boolean audioCaptured;
+	/** Per stream: next frame to pull, recording segment, and when to try again after "nothing recorded". */
+	private final long[] audioNext = new long[AUDIO_STREAMS.length];
+	private final int[] audioSegment = new int[AUDIO_STREAMS.length];
+	private final long[] audioRetryAt = new long[AUDIO_STREAMS.length];
+
+	private static String audioCheckedExe = "";
+	private static boolean audioCheckedResult;
+
+	/**
+	 * Whether this 86Box can hand its sound over the automation socket
+	 * ("audio pull", in 86Box since October 2026). Then the mod mutes 86Box's own
+	 * output and plays the sound from the PC instead.
+	 */
+	public static synchronized boolean supportsAudio(File exe) {
+		String key = exe.getAbsolutePath() + "|" + exe.lastModified() + "|" + exe.length();
+		if (!key.equals(audioCheckedExe)) {
+			audioCheckedExe = key;
+			audioCheckedResult = fileContains(exe, "audio pull <stream> <from>".getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+		}
+		return audioCheckedResult;
+	}
+
+	private static boolean fileContains(File f, byte[] needle) {
+		try (java.io.InputStream in = new java.io.BufferedInputStream(new java.io.FileInputStream(f), 1 << 16)) {
+			// Simple streaming search; the needle has no repeated prefix worth a KMP table.
+			int matched = 0;
+			int b;
+			while ((b = in.read()) >= 0) {
+				if (b == (needle[matched] & 0xff)) {
+					if (++matched == needle.length) {
+						return true;
+					}
+				} else {
+					matched = (b == (needle[0] & 0xff)) ? 1 : 0;
+				}
+			}
+		} catch (IOException e) {
+			// Treat as unsupported: 86Box keeps playing its own sound.
+		}
+		return false;
+	}
 
 	private final AtomicReference<Frame> frame = new AtomicReference<>();
 	private long frameSerial;
@@ -291,9 +334,9 @@ public final class VmSession {
 				throw new IOException("Unknown 86Box automation protocol " + Json.integer(status, "protocol", 0));
 			}
 			state = State.RUNNING;
-			// Take over the sound so the game can play it from the PC. Older 86Box
-			// builds don't know the command and keep playing it themselves.
-			audioCaptured = Json.bool(client.command("audio on"), "ok", false);
+			// Record the sound in memory so the game can play it from the PC (86Box's
+			// own output is muted in the config when this is available).
+			audioCaptured = supportsAudio(exe) && Json.bool(client.command("audio start"), "ok", false);
 
 			long nextFrame = 0;
 			long nextAudio = 0;
@@ -379,14 +422,27 @@ public final class VmSession {
 	}
 
 	private void grabAudio() throws IOException {
-		Map<String, Object> r = client.command("audio read");
-		if (!Json.bool(r, "ok", false)) {
-			return;
-		}
-		for (Object o : Json.arr(r, "streams")) {
-			@SuppressWarnings("unchecked")
-			Map<String, Object> st = (Map<String, Object>) o;
-			byte[] pcm = Base64.getDecoder().decode(Json.str(st, "pcm", ""));
+		long now = System.currentTimeMillis();
+		for (int i = 0; i < AUDIO_STREAMS.length; i++) {
+			if (now < audioRetryAt[i]) {
+				continue;
+			}
+			Map<String, Object> st = client.command("audio pull " + AUDIO_STREAMS[i] + " " + audioNext[i] + " 48000");
+			if (!Json.bool(st, "ok", false)) {
+				audioRetryAt[i] = now + 1000; // this stream hasn't made a sound yet
+				continue;
+			}
+			int segment = Json.integer(st, "segment", 0);
+			if (segment != audioSegment[i]) {
+				// The stream changed (e.g. its sample rate); positions start over.
+				audioSegment[i] = segment;
+				if (Json.lng(st, "from", 0) != 0 || audioNext[i] != 0) {
+					audioNext[i] = 0;
+					continue;
+				}
+			}
+			audioNext[i] = Json.lng(st, "next", audioNext[i]);
+			byte[] pcm = Base64.getDecoder().decode(Json.str(st, "data", ""));
 			int frames = pcm.length / 4;
 			if (frames == 0) {
 				continue;
@@ -394,14 +450,14 @@ public final class VmSession {
 			// Positional sound in OpenAL has to be mono.
 			short[] mono = new short[frames];
 			boolean silent = true;
-			for (int i = 0; i < frames; i++) {
-				int l = (short) ((pcm[i * 4] & 0xff) | (pcm[i * 4 + 1] << 8));
-				int rr = (short) ((pcm[i * 4 + 2] & 0xff) | (pcm[i * 4 + 3] << 8));
-				mono[i] = (short) ((l + rr) / 2);
-				silent &= mono[i] == 0;
+			for (int f = 0; f < frames; f++) {
+				int l = (short) ((pcm[f * 4] & 0xff) | (pcm[f * 4 + 1] << 8));
+				int rr = (short) ((pcm[f * 4 + 2] & 0xff) | (pcm[f * 4 + 3] << 8));
+				mono[f] = (short) ((l + rr) / 2);
+				silent &= mono[f] == 0;
 			}
 			if (audio.size() < AUDIO_QUEUE_MAX) {
-				audio.add(new AudioChunk(Json.integer(st, "src", 0), Json.integer(st, "rate", 48000), mono, silent));
+				audio.add(new AudioChunk(i, Json.integer(st, "rate", 48000), mono, silent));
 			}
 		}
 	}

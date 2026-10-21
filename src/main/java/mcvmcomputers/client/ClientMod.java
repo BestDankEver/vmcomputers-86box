@@ -275,7 +275,7 @@ public class ClientMod implements ClientModInitializer {
 					File dir = new File(machinesDirectory, safe(pcId));
 					dir.mkdirs();
 					ConfigWriter.write(new File(dir, "86box.cfg"), spec, cat,
-							new ConfigWriter.Folders(vhdDirectory, isoDirectory, floppyDirectory));
+							new ConfigWriter.Folders(vhdDirectory, isoDirectory, floppyDirectory), VmSession.supportsAudio(inst.exe));
 					vmStatus = "Starting 86Box " + inst.version + "...";
 					VmSession session = new VmSession(inst.exe, inst.roms, dir, "VMC86-" + safe(pcId).substring(0, Math.min(8, safe(pcId).length())),
 							settings.frameIntervalMs);

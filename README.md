@@ -150,9 +150,9 @@ pages. The old "32/64-bit motherboard", "1/N host CPU" and fixed RAM items are g
   and then a newline, which adds up to 40–200 ms per request because of Nagle's
   algorithm. The mod works around this, but setting `TCP_NODELAY`, or sending the
   newline together with the reply, would fix it in 86Box itself.
-- **Missing commands.** A mouse-wheel command is the last gap. The audio stream
-  (`audio on|off|read`) and starting without taking the focus are small patches in
-  `tools/86box-patches` that could go upstream.
+- **Missing commands.** A mouse-wheel command is the last gap.
+- **Focus.** Starting 86Box without taking the keyboard focus from the program that
+  drives it is a small patch in `tools/86box-patches` that could go upstream.
 - **Official builds.** Turning `AUTOMATION` on in the official builds would let the
   mod use them directly.
 

@@ -134,16 +134,28 @@ public final class ConfigWriter {
 	}
 
 	public static void write(File cfgFile, HardwareSpec spec, Catalog cat, Folders folders) throws IOException {
-		Files.write(cfgFile.toPath(), build(spec, cat, folders).getBytes(StandardCharsets.UTF_8));
+		write(cfgFile, spec, cat, folders, false);
+	}
+
+	/** @param muteHost keep 86Box's own speakers quiet (the game plays the sound from the PC instead) */
+	public static void write(File cfgFile, HardwareSpec spec, Catalog cat, Folders folders, boolean muteHost) throws IOException {
+		Files.write(cfgFile.toPath(), build(spec, cat, folders, muteHost).getBytes(StandardCharsets.UTF_8));
 	}
 
 	public static String build(HardwareSpec spec, Catalog cat, Folders folders) {
+		return build(spec, cat, folders, false);
+	}
+
+	public static String build(HardwareSpec spec, Catalog cat, Folders folders, boolean muteHost) {
 		Machine m = (cat == null || spec.motherboard == null) ? null : cat.machine(spec.motherboard.id);
 		Ini ini = new Ini();
 
 		// General: software renderer (86Box's window is hidden), keep the VM quiet about itself.
 		ini.set("General", "vid_renderer", "qt_software");
 		ini.set("General", "window_remember", "0");
+		if (muteHost) {
+			ini.set("General", "sound_muted", "1");
+		}
 
 		// Machine.
 		if (spec.motherboard != null) {
