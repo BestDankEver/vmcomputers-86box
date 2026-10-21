@@ -74,7 +74,7 @@ public class ServerMixin {
 				}
 			} else if (order.currentStatus == OrderStatus.ORDER_CHEST_ARRIVED || order.currentStatus == OrderStatus.PAYMENT_CHEST_ARRIVED) {
 				if (!order.entitySpawned) {
-					p.world.spawnEntity(new EntityDeliveryChest(p.world, new Vec3d(p.getX(), p.getY(), p.getZ()), p.getUuid()));
+					p.getWorld().spawnEntity(new EntityDeliveryChest(p.getWorld(), new Vec3d(p.getX(), p.getY(), p.getZ()), p.getUuid()));
 					order.entitySpawned = true;
 				}
 			}

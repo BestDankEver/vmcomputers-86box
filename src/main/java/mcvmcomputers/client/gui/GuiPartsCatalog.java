@@ -1,5 +1,7 @@
 package mcvmcomputers.client.gui;
 
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.text.Text;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -28,8 +30,6 @@ import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.item.ItemStack;
-import net.minecraft.text.LiteralText;
-import net.minecraft.text.TranslatableText;
 import net.minecraft.util.Language;
 
 /**
@@ -95,7 +95,7 @@ public class GuiPartsCatalog extends Screen {
 	private long flashUntil;
 
 	public GuiPartsCatalog() {
-		super(new TranslatableText("mcvmcomputers.catalog.title"));
+		super(Text.translatable("mcvmcomputers.catalog.title"));
 	}
 
 	/** Which motherboard "fits" means: last board put in the cart, else the PC last opened, else one in the inventory. */
@@ -110,14 +110,14 @@ public class GuiPartsCatalog extends Screen {
 				targetSource = lang.get("mcvmcomputers.catalog.target_cart");
 			}
 		}
-		if (target == null && ClientMod.currentPC != null && !ClientMod.currentPC.removed && ClientMod.currentPC.getHardware().motherboard != null) {
+		if (target == null && ClientMod.currentPC != null && !ClientMod.currentPC.isRemoved() && ClientMod.currentPC.getHardware().motherboard != null) {
 			target = cat.machine(ClientMod.currentPC.getHardware().motherboard.id);
 			targetSource = lang.get("mcvmcomputers.catalog.target_pc");
 		}
 		MinecraftClient mc = MinecraftClient.getInstance();
 		if (target == null && mc.player != null) {
-			for (int i = 0; i < mc.player.inventory.size() && target == null; i++) {
-				ItemStack s = mc.player.inventory.getStack(i);
+			for (int i = 0; i < mc.player.getInventory().size() && target == null; i++) {
+				ItemStack s = mc.player.getInventory().getStack(i);
 				if (s.getItem() == ItemList.ITEM_MOTHERBOARD) {
 					HardwareSpec.Part p = ItemPart.toPart(s);
 					target = p == null ? null : cat.machine(p.id);
@@ -252,7 +252,7 @@ public class GuiPartsCatalog extends Screen {
 	}
 
 	private void openSetup(Entry e) {
-		MinecraftClient.getInstance().openScreen(new GuiOptions(this, e.sections, e.preset,
+		MinecraftClient.getInstance().setScreen(new GuiOptions(this, e.sections, e.preset,
 				v -> e.makeWith.apply(v).getName().getString(),
 				v -> lang.get("mcvmcomputers.card_options.add").replace("%s", "" + PartPricing.price(e.makeWith.apply(v))),
 				v -> {
@@ -288,8 +288,7 @@ public class GuiPartsCatalog extends Screen {
 
 	@Override
 	protected void init() {
-		this.buttons.clear();
-		this.children.clear();
+		this.clearChildren();
 		labels.clear();
 
 		// Tabs.
@@ -297,7 +296,7 @@ public class GuiPartsCatalog extends Screen {
 		for (Tab tb : Tab.values()) {
 			String n = lang.get(tb.key);
 			int w = this.textRenderer.getWidth(n) + 10;
-			ButtonWidget b = this.addButton(WideButton.of(x, 4, w, 16, new LiteralText(n), btn -> {
+			ButtonWidget b = this.addDrawableChild(WideButton.of(x, 4, w, 16, Text.literal(n), btn -> {
 				tab = tb;
 				scroll = 0;
 				buildEntries();
@@ -308,7 +307,7 @@ public class GuiPartsCatalog extends Screen {
 		}
 
 		String old = search == null ? lastSearch : search.getText();
-		search = new TextFieldWidget(this.textRenderer, 6, 24, 180, 16, new LiteralText(""));
+		search = new TextFieldWidget(this.textRenderer, 6, 24, 180, 16, Text.literal(""));
 		search.setMaxLength(64);
 		search.setText(old);
 		search.setChangedListener(s -> {
@@ -317,7 +316,7 @@ public class GuiPartsCatalog extends Screen {
 			buildEntries();
 			rebuildRows();
 		});
-		this.children.add(search);
+		this.addSelectableChild(search);
 		this.setInitialFocus(search);
 
 		buildEntries();
@@ -327,23 +326,21 @@ public class GuiPartsCatalog extends Screen {
 	/** Rebuilds the row buttons and filter toggle, keeping the search box. */
 	private void rebuildRows() {
 		List<Object> keep = new ArrayList<>();
-		for (Object o : this.buttons) {
-			ButtonWidget b = (ButtonWidget) o;
-			if (b.y == 4) {
-				keep.add(b);
+		for (Object o : this.children()) {
+			if (o instanceof ButtonWidget && ((ButtonWidget) o).getY() == 4) {
+				keep.add(o);
 			}
 		}
-		this.buttons.clear();
-		this.children.clear();
+		this.clearChildren();
 		for (Object o : keep) {
-			this.addButton((ButtonWidget) o);
+			this.addDrawableChild((ButtonWidget) o);
 		}
-		this.children.add(search);
+		this.addSelectableChild(search);
 		labels.clear();
 
 		if (target != null && tab != Tab.BOARDS && tab != Tab.DRIVES) {
 			String label = lang.get(onlyFitting ? "mcvmcomputers.catalog.only_fitting_on" : "mcvmcomputers.catalog.only_fitting_off");
-			this.addButton(WideButton.of(192, 24, this.textRenderer.getWidth(label) + 10, 16, new LiteralText(label), b -> {
+			this.addDrawableChild(WideButton.of(192, 24, this.textRenderer.getWidth(label) + 10, 16, Text.literal(label), b -> {
 				onlyFitting = !onlyFitting;
 				scroll = 0;
 				buildEntries();
@@ -369,13 +366,13 @@ public class GuiPartsCatalog extends Screen {
 			}
 			labels.add(new Object[] { priceX, y + 3, 0xdddddd, lang.get("mcvmcomputers.catalog.price").replace("%s", "" + e.price()) });
 			if (e.configurable()) {
-				this.addButton(WideButton.of(this.width - 100, y, 46, 13, new LiteralText(lang.get("mcvmcomputers.catalog.configure")), b -> {
+				this.addDrawableChild(WideButton.of(this.width - 100, y, 46, 13, Text.literal(lang.get("mcvmcomputers.catalog.configure")), b -> {
 					if (ClientMod.tabletOS != null) {
 						openSetup(e);
 					}
 				}));
 			}
-			this.addButton(WideButton.of(this.width - 52, y, 46, 13, new LiteralText(lang.get("mcvmcomputers.catalog.add")), b -> {
+			this.addDrawableChild(WideButton.of(this.width - 52, y, 46, 13, Text.literal(lang.get("mcvmcomputers.catalog.add")), b -> {
 				if (ClientMod.tabletOS == null) {
 					return;
 				}
@@ -386,8 +383,8 @@ public class GuiPartsCatalog extends Screen {
 			y += ROW;
 		}
 
-		this.addButton(WideButton.of(this.width - 106, this.height - 26, 100, 20, new LiteralText(lang.get("mcvmcomputers.catalog.done")),
-				b -> this.onClose()));
+		this.addDrawableChild(WideButton.of(this.width - 106, this.height - 26, 100, 20, Text.literal(lang.get("mcvmcomputers.catalog.done")),
+				b -> this.close()));
 	}
 
 	@Override
@@ -403,25 +400,25 @@ public class GuiPartsCatalog extends Screen {
 	}
 
 	@Override
-	public void render(MatrixStack ms, int mouseX, int mouseY, float delta) {
+	public void render(DrawContext ms, int mouseX, int mouseY, float delta) {
 		this.renderBackground(ms);
 		search.render(ms, mouseX, mouseY, delta);
 		for (Object[] l : labels) {
-			this.textRenderer.draw(ms, (String) l[3], (int) l[0], (int) l[1], (int) l[2]);
+			ms.drawText(this.textRenderer, (String) l[3], (int) ((int) l[0]), (int) ((int) l[1]), (int) l[2], false);
 		}
 		int cartCount = ClientMod.tabletOS == null ? 0 : ClientMod.tabletOS.cart().size();
 		int cartPrice = ClientMod.tabletOS == null ? 0 : ClientMod.tabletOS.cartPrice();
 		String footer = lang.get("mcvmcomputers.catalog.footer").replaceFirst("%s", "" + entries.size()).replaceFirst("%s", "" + cartCount)
 				.replaceFirst("%s", "" + cartPrice);
-		this.textRenderer.draw(ms, footer, 6, this.height - 20, 0xaaaaaa);
+		ms.drawText(this.textRenderer, footer, 6, (int) (this.height - 20), 0xaaaaaa, false);
 		if (System.currentTimeMillis() < flashUntil) {
-			this.textRenderer.draw(ms, this.textRenderer.trimToWidth(flash, this.width - 130), 6, this.height - 32, 0x55ff55);
+			ms.drawText(this.textRenderer, this.textRenderer.trimToWidth(flash, this.width - 130), 6, (int) (this.height - 32), 0x55ff55, false);
 		}
 		super.render(ms, mouseX, mouseY, delta);
 	}
 
 	@Override
-	public boolean isPauseScreen() {
+	public boolean shouldPause() {
 		return false;
 	}
 }

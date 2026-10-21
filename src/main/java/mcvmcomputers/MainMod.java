@@ -1,5 +1,6 @@
 package mcvmcomputers;
 
+import net.minecraft.text.Text;
 import static mcvmcomputers.networking.PacketList.*;
 
 import java.util.ArrayList;
@@ -27,7 +28,6 @@ import net.minecraft.entity.Entity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.text.TranslatableText;
 import net.minecraft.util.Formatting;
 
 public class MainMod implements ModInitializer {
@@ -72,7 +72,7 @@ public class MainMod implements ModInitializer {
 
 	/** The PC with this entity id, if it belongs to the player. */
 	private static EntityPC ownedPc(ServerPlayerEntity player, int entityId) {
-		Entity e = player.world.getEntityById(entityId);
+		Entity e = player.getWorld().getEntityById(entityId);
 		if (e instanceof EntityPC && ((EntityPC) e).isOwnedBy(player) && e.squaredDistanceTo(player) < 64 * 64) {
 			return (EntityPC) e;
 		}
@@ -81,12 +81,12 @@ public class MainMod implements ModInitializer {
 
 	private static void give(ServerPlayerEntity player, ItemStack stack) {
 		if (!stack.isEmpty()) {
-			player.inventory.offerOrDrop(player.world, stack);
+			player.getInventory().offerOrDrop(stack);
 		}
 	}
 
 	private static void deny(ServerPlayerEntity player, String key, Object... args) {
-		player.sendMessage(new TranslatableText(key, args).formatted(Formatting.RED), false);
+		player.sendMessage(Text.translatable(key, args).formatted(Formatting.RED), false);
 	}
 
 	/** File names the client may refer to: no folders, no traversal. */
@@ -153,7 +153,7 @@ public class MainMod implements ModInitializer {
 					if (p != player) {
 						PacketByteBuf b = PacketByteBufs.create();
 						b.writeUuid(player.getUuid());
-						b.writeInt(pc.getEntityId());
+						b.writeInt(pc.getId());
 						b.writeInt(stream);
 						b.writeByteArray(data);
 						ServerPlayNetworking.send(p, S2C_AUDIO, b);
@@ -260,14 +260,14 @@ public class MainMod implements ModInitializer {
 
 	private static void installPart(ServerPlayerEntity player, int entityId, int invSlot) {
 		EntityPC pc = ownedPc(player, entityId);
-		if (pc == null || invSlot < 0 || invSlot >= player.inventory.size()) {
+		if (pc == null || invSlot < 0 || invSlot >= player.getInventory().size()) {
 			return;
 		}
 		if (isRunning(pc)) {
 			deny(player, "mcvmcomputers.turn_off_first");
 			return;
 		}
-		ItemStack stack = player.inventory.getStack(invSlot);
+		ItemStack stack = player.getInventory().getStack(invSlot);
 		if (stack.isEmpty()) {
 			return;
 		}

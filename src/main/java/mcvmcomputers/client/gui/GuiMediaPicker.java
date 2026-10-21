@@ -1,5 +1,7 @@
 package mcvmcomputers.client.gui;
 
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.text.Text;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -17,8 +19,6 @@ import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.network.PacketByteBuf;
-import net.minecraft.text.LiteralText;
-import net.minecraft.text.TranslatableText;
 import net.minecraft.util.Language;
 import net.minecraft.util.Util;
 
@@ -37,7 +37,7 @@ public class GuiMediaPicker extends Screen {
 	private int scroll;
 
 	public GuiMediaPicker(Screen parent, EntityPC pc, int kind, int drive) {
-		super(new TranslatableText("mcvmcomputers.media.title"));
+		super(Text.translatable("mcvmcomputers.media.title"));
 		this.parent = parent;
 		this.pc = pc;
 		this.kind = kind;
@@ -66,7 +66,7 @@ public class GuiMediaPicker extends Screen {
 			}
 		}
 		PacketByteBuf b = PacketByteBufs.create();
-		b.writeInt(pc.getEntityId());
+		b.writeInt(pc.getId());
 		b.writeInt(kind);
 		b.writeInt(drive);
 		b.writeString(file);
@@ -97,30 +97,29 @@ public class GuiMediaPicker extends Screen {
 
 	@Override
 	protected void init() {
-		this.buttons.clear();
-		this.children.clear();
+		this.clearChildren();
 		int x = this.width / 2 - 150;
 		int y = 40 - scroll;
 		for (File f : files()) {
 			if (y >= 30 && y < this.height - 50) {
 				String name = f.getName();
 				String label = f.isDirectory() ? lang.get("mcvmcomputers.media.folder").replace("%s", name) : name;
-				this.addButton(WideButton.of(x, y, 300, 14, new LiteralText(this.textRenderer.trimToWidth(label, 290)), b -> {
+				this.addDrawableChild(WideButton.of(x, y, 300, 14, Text.literal(this.textRenderer.trimToWidth(label, 290)), b -> {
 					setMedia(pc, kind, drive, name);
-					MinecraftClient.getInstance().openScreen(parent);
+					MinecraftClient.getInstance().setScreen(parent);
 				}));
 			}
 			y += 16;
 		}
 		int by = this.height - 28;
-		this.addButton(WideButton.of(this.width / 2 - 154, by, 100, 20, new LiteralText(lang.get("mcvmcomputers.media.open_folder")),
+		this.addDrawableChild(WideButton.of(this.width / 2 - 154, by, 100, 20, Text.literal(lang.get("mcvmcomputers.media.open_folder")),
 				b -> Util.getOperatingSystem().open(folder())));
-		this.addButton(WideButton.of(this.width / 2 - 50, by, 100, 20, new LiteralText(lang.get("mcvmcomputers.pc_editing.eject")), b -> {
+		this.addDrawableChild(WideButton.of(this.width / 2 - 50, by, 100, 20, Text.literal(lang.get("mcvmcomputers.pc_editing.eject")), b -> {
 			setMedia(pc, kind, drive, "");
-			MinecraftClient.getInstance().openScreen(parent);
+			MinecraftClient.getInstance().setScreen(parent);
 		}));
-		this.addButton(WideButton.of(this.width / 2 + 54, by, 100, 20, new LiteralText(lang.get("gui.back")),
-				b -> MinecraftClient.getInstance().openScreen(parent)));
+		this.addDrawableChild(WideButton.of(this.width / 2 + 54, by, 100, 20, Text.literal(lang.get("gui.back")),
+				b -> MinecraftClient.getInstance().setScreen(parent)));
 	}
 
 	@Override
@@ -131,24 +130,24 @@ public class GuiMediaPicker extends Screen {
 	}
 
 	@Override
-	public void render(MatrixStack ms, int mouseX, int mouseY, float delta) {
+	public void render(DrawContext ms, int mouseX, int mouseY, float delta) {
 		this.renderBackground(ms);
 		String title = lang.get(kind == PacketList.MEDIA_FLOPPY ? "mcvmcomputers.media.floppy_title" : "mcvmcomputers.media.cd_title");
-		this.textRenderer.draw(ms, title, this.width / 2 - this.textRenderer.getWidth(title) / 2, 16, 0xffffff);
+		ms.drawText(this.textRenderer, title, (int) (this.width / 2 - this.textRenderer.getWidth(title) / 2), 16, 0xffffff, false);
 		if (files().isEmpty()) {
 			String s = lang.get("mcvmcomputers.media.none").replace("%s", folder().getAbsolutePath());
-			this.textRenderer.draw(ms, this.textRenderer.trimToWidth(s, 380), this.width / 2 - 190, 44, 0xaaaaaa);
+			ms.drawText(this.textRenderer, this.textRenderer.trimToWidth(s, 380), (int) (this.width / 2 - 190), 44, 0xaaaaaa, false);
 		}
 		super.render(ms, mouseX, mouseY, delta);
 	}
 
 	@Override
-	public void onClose() {
-		MinecraftClient.getInstance().openScreen(parent);
+	public void close() {
+		MinecraftClient.getInstance().setScreen(parent);
 	}
 
 	@Override
-	public boolean isPauseScreen() {
+	public boolean shouldPause() {
 		return false;
 	}
 }

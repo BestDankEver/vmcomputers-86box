@@ -44,15 +44,13 @@ import mcvmcomputers.utils.TabletOrder;
 import mcvmcomputers.utils.TabletOrder.OrderStatus;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.fabricmc.fabric.api.client.rendereregistry.v1.EntityRendererRegistry;
+import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.item.ItemStack;
 import net.minecraft.network.PacketByteBuf;
-import net.minecraft.text.LiteralText;
 import net.minecraft.text.Text;
-import net.minecraft.text.TranslatableText;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
 
@@ -216,7 +214,7 @@ public class ClientMod implements ClientModInitializer {
 	/** Switches on the given PC: downloads 86Box if needed, writes its config and starts it. */
 	public static void powerOn(EntityPC pc) {
 		if (anyRunning()) {
-			chat(new TranslatableText("mcvmcomputers.one_vm_at_a_time").formatted(Formatting.RED));
+			chat(Text.translatable("mcvmcomputers.one_vm_at_a_time").formatted(Formatting.RED));
 			return;
 		}
 		HardwareSpec spec = pc.copyHardware();
@@ -225,33 +223,33 @@ public class ClientMod implements ClientModInitializer {
 		if (HardwareSpec.anyBlocking(problems)) {
 			for (HardwareSpec.Problem p : problems) {
 				if (p.blocking) {
-					chat(new LiteralText(p.message).formatted(Formatting.RED));
+					chat(Text.literal(p.message).formatted(Formatting.RED));
 				}
 			}
 			return;
 		}
 		for (HardwareSpec.DiskPart d : spec.hardDisks) {
 			if (!new File(vhdDirectory, d.file).isFile()) {
-				chat(new TranslatableText("mcvmcomputers.hdd_doesnt_exist", d.file).formatted(Formatting.RED));
+				chat(Text.translatable("mcvmcomputers.hdd_doesnt_exist", d.file).formatted(Formatting.RED));
 				return;
 			}
 		}
 		// Media that went missing is simply not inserted.
 		for (int i = 0; i < spec.cdImages.size(); i++) {
 			if (!spec.cdImages.get(i).isEmpty() && !new File(isoDirectory, spec.cdImages.get(i)).isFile()) {
-				chat(new TranslatableText("mcvmcomputers.iso_doesnt_exist", spec.cdImages.get(i)).formatted(Formatting.YELLOW));
+				chat(Text.translatable("mcvmcomputers.iso_doesnt_exist", spec.cdImages.get(i)).formatted(Formatting.YELLOW));
 				spec.setCdImage(i, "");
 			}
 		}
 		for (int i = 0; i < spec.floppyImages.size(); i++) {
 			if (!spec.floppyImages.get(i).isEmpty() && !new File(floppyDirectory, spec.floppyImages.get(i)).isFile()) {
-				chat(new TranslatableText("mcvmcomputers.iso_doesnt_exist", spec.floppyImages.get(i)).formatted(Formatting.YELLOW));
+				chat(Text.translatable("mcvmcomputers.iso_doesnt_exist", spec.floppyImages.get(i)).formatted(Formatting.YELLOW));
 				spec.setFloppyImage(i, "");
 			}
 		}
 
 		final String pcId = pc.getPcId();
-		final int entityId = pc.getEntityId();
+		final int entityId = pc.getId();
 		vmPreparing = true;
 		vmPcId = pcId;
 		vmEntityId = entityId;
@@ -292,7 +290,7 @@ public class ClientMod implements ClientModInitializer {
 					String err = String.valueOf(session.error());
 					if (attempt == 0 && missingRom(dir, err)) {
 						// The catalog is newer than our ROM set: update it and try once more.
-						chat(new TranslatableText("mcvmcomputers.updating_roms").formatted(Formatting.YELLOW));
+						chat(Text.translatable("mcvmcomputers.updating_roms").formatted(Formatting.YELLOW));
 						forceRoms = true;
 						continue;
 					}
@@ -301,7 +299,7 @@ public class ClientMod implements ClientModInitializer {
 			} catch (Exception e) {
 				reportedFailure = true;
 				vmStatus = "";
-				chat(new TranslatableText("mcvmcomputers.failed_to_start", e.getMessage()).formatted(Formatting.RED));
+				chat(Text.translatable("mcvmcomputers.failed_to_start", e.getMessage()).formatted(Formatting.RED));
 				MinecraftClient.getInstance().execute(ClientMod::powerOffNow);
 			} finally {
 				vmPreparing = false;
@@ -412,7 +410,7 @@ public class ClientMod implements ClientModInitializer {
 			} else if (v.state() == VmSession.State.FAILED && !vmPreparing) {
 				if (!reportedFailure) {
 					reportedFailure = true;
-					chat(new TranslatableText("mcvmcomputers.vm_crashed", String.valueOf(v.error())).formatted(Formatting.RED));
+					chat(Text.translatable("mcvmcomputers.vm_crashed", String.valueOf(v.error())).formatted(Formatting.RED));
 				}
 				powerOffNow();
 			} else if (v.state() == VmSession.State.STOPPED && !vmPreparing) {
@@ -525,9 +523,9 @@ public class ClientMod implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		MainMod.pcOpenGui = () -> MinecraftClient.getInstance().openScreen(new GuiPCEditing(currentPC));
-		MainMod.hardDriveClick = () -> MinecraftClient.getInstance().openScreen(new GuiCreateHarddrive());
-		MainMod.focus = () -> MinecraftClient.getInstance().openScreen(new GuiFocus());
+		MainMod.pcOpenGui = () -> MinecraftClient.getInstance().setScreen(new GuiPCEditing(currentPC));
+		MainMod.hardDriveClick = () -> MinecraftClient.getInstance().setScreen(new GuiCreateHarddrive());
+		MainMod.focus = () -> MinecraftClient.getInstance().setScreen(new GuiFocus());
 		MainMod.deliveryChestSound = () -> {
 			if (currentDeliveryChest != null && MinecraftClient.getInstance().getSoundManager().isPlaying(currentDeliveryChest.rocketSound)) {
 				MinecraftClient.getInstance().getSoundManager().stop(currentDeliveryChest.rocketSound);
@@ -536,13 +534,13 @@ public class ClientMod implements ClientModInitializer {
 
 		registerClientPackets();
 
-		EntityRendererRegistry.INSTANCE.register(EntityList.ITEM_PREVIEW, (d, context) -> new ItemPreviewRender(d));
-		EntityRendererRegistry.INSTANCE.register(EntityList.KEYBOARD, (d, context) -> new KeyboardRender(d));
-		EntityRendererRegistry.INSTANCE.register(EntityList.MOUSE, (d, context) -> new MouseRender(d));
-		EntityRendererRegistry.INSTANCE.register(EntityList.CRT_SCREEN, (d, context) -> new CRTScreenRender(d));
-		EntityRendererRegistry.INSTANCE.register(EntityList.FLATSCREEN, (d, context) -> new FlatScreenRender(d));
-		EntityRendererRegistry.INSTANCE.register(EntityList.WALLTV, (d, context) -> new WallTVRender(d));
-		EntityRendererRegistry.INSTANCE.register(EntityList.PC, (d, context) -> new PCRender(d));
-		EntityRendererRegistry.INSTANCE.register(EntityList.DELIVERY_CHEST, (d, context) -> new DeliveryChestRender(d));
+		EntityRendererRegistry.register(EntityList.ITEM_PREVIEW, ItemPreviewRender::new);
+		EntityRendererRegistry.register(EntityList.KEYBOARD, KeyboardRender::new);
+		EntityRendererRegistry.register(EntityList.MOUSE, MouseRender::new);
+		EntityRendererRegistry.register(EntityList.CRT_SCREEN, CRTScreenRender::new);
+		EntityRendererRegistry.register(EntityList.FLATSCREEN, FlatScreenRender::new);
+		EntityRendererRegistry.register(EntityList.WALLTV, WallTVRender::new);
+		EntityRendererRegistry.register(EntityList.PC, PCRender::new);
+		EntityRendererRegistry.register(EntityList.DELIVERY_CHEST, DeliveryChestRender::new);
 	}
 }

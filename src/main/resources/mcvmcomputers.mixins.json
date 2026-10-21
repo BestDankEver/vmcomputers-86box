@@ -10,8 +10,7 @@
   "client": [
     "HeldItemMixin",
     "KeyboardMixin",
-    "GameloopMixin",
-    "ClientPlayNetworkMixin"
+    "GameloopMixin"
   ],
   "injectors": {
     "defaultRequire": 1

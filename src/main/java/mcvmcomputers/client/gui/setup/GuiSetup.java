@@ -1,5 +1,7 @@
 package mcvmcomputers.client.gui.setup;
 
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.text.Text;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -16,7 +18,6 @@ import net.minecraft.client.gui.Element;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.text.LiteralText;
 import net.minecraft.util.Language;
 
 /** First screen after launch: folder, unfocus keys, then on to the title screen. */
@@ -33,23 +34,23 @@ public class GuiSetup extends Screen {
 	private final MinecraftClient minecraft = MinecraftClient.getInstance();
 
 	public GuiSetup() {
-		super(new LiteralText("Setup"));
+		super(Text.literal("Setup"));
 	}
 
-	public void addElement(Element e) {
-		this.children.add(e);
+	public <T extends Element & net.minecraft.client.gui.Selectable> void addElement(T e) {
+		this.addSelectableChild(e);
 	}
 
 	public void clearElements() {
-		this.children.clear();
+		this.clearChildren();
 	}
 
 	public void clearButtons() {
-		this.buttons.clear();
+		this.clearChildren();
 	}
 
 	public void addButton(ButtonWidget bw) {
-		super.addButton(bw);
+		this.addDrawableChild(bw);
 	}
 
 	public void nextPage() {
@@ -113,12 +114,12 @@ public class GuiSetup extends Screen {
 	}
 
 	@Override
-	public void render(MatrixStack ms, int mouseX, int mouseY, float delta) {
+	public void render(DrawContext ms, int mouseX, int mouseY, float delta) {
 		this.renderBackground(ms);
 		String title = translation("mcvmcomputers.setup.title");
-		this.textRenderer.draw(ms, title, this.width / 2 - this.textRenderer.getWidth(title) / 2, 20, -1);
+		ms.drawText(this.textRenderer, title, (int) (this.width / 2 - this.textRenderer.getWidth(title) / 2), 20, -1, false);
 		String s = translation("mcvmcomputers.setup.page").replaceFirst("%s", "" + (setupIndex + 1)).replaceFirst("%s", "" + setupPages.size());
-		this.textRenderer.draw(ms, s, this.width / 2 - this.textRenderer.getWidth(s) / 2, 30, -1);
+		ms.drawText(this.textRenderer, s, (int) (this.width / 2 - this.textRenderer.getWidth(s) / 2), 30, -1, false);
 		currentSetupPage.render(ms, mouseX, mouseY, delta);
 		super.render(ms, mouseX, mouseY, delta);
 	}

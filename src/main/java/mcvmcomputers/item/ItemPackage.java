@@ -6,14 +6,14 @@ import net.minecraft.client.item.TooltipContext;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtCompound;
 import net.minecraft.text.Text;
-import net.minecraft.text.TranslatableText;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Hand;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.TypedActionResult;
-import net.minecraft.util.registry.Registry;
+import net.minecraft.registry.Registry;
+import net.minecraft.registry.Registries;
 import net.minecraft.world.World;
 
 /** A delivered package; right-click to unwrap the item inside (with its NBT, e.g. which CPU it is). */
@@ -22,20 +22,16 @@ public class ItemPackage extends Item {
 		super(settings);
 	}
 
-	@Override
-	public boolean shouldSyncTagToClient() {
-		return true;
-	}
 
 	private static ItemStack contents(ItemStack pkg) {
-		CompoundTag t = pkg.getTag();
+		NbtCompound t = pkg.getNbt();
 		if (t == null || !t.contains("packaged_item")) {
 			return ItemStack.EMPTY;
 		}
-		Item item = Registry.ITEM.get(new Identifier(t.getString("packaged_item")));
+		Item item = Registries.ITEM.get(new Identifier(t.getString("packaged_item")));
 		ItemStack s = new ItemStack(item);
 		if (t.contains("packaged_tag", 10)) {
-			s.setTag(t.getCompound("packaged_tag").copy());
+			s.setNbt(t.getCompound("packaged_tag").copy());
 		}
 		return s;
 	}
@@ -54,7 +50,7 @@ public class ItemPackage extends Item {
 		}
 		is.decrement(1);
 		if (!world.isClient) {
-			user.inventory.offerOrDrop(world, inside);
+			user.getInventory().offerOrDrop(inside);
 		}
 		return TypedActionResult.success(is, world.isClient);
 	}
@@ -63,23 +59,23 @@ public class ItemPackage extends Item {
 	public Text getName(ItemStack stack) {
 		ItemStack inside = contents(stack);
 		if (!inside.isEmpty()) {
-			return new TranslatableText("mcvmcomputers.packaged").formatted(Formatting.GRAY)
-					.append(inside.getName().shallowCopy().formatted(Formatting.GREEN));
+			return Text.translatable("mcvmcomputers.packaged").formatted(Formatting.GRAY)
+					.append(inside.getName().copy().formatted(Formatting.GREEN));
 		}
-		return new TranslatableText("mcvmcomputers.invalid_package").formatted(Formatting.RED);
+		return Text.translatable("mcvmcomputers.invalid_package").formatted(Formatting.RED);
 	}
 
 	@Override
 	public void appendTooltip(ItemStack stack, World world, List<Text> tooltip, TooltipContext context) {
-		tooltip.add(new TranslatableText("mcvmcomputers.open_with_right_click").formatted(Formatting.GRAY));
+		tooltip.add(Text.translatable("mcvmcomputers.open_with_right_click").formatted(Formatting.GRAY));
 	}
 
 	public static ItemStack createPackage(ItemStack contents) {
 		ItemStack is = new ItemStack(ItemList.ITEM_PACKAGE);
-		CompoundTag ct = is.getOrCreateTag();
-		ct.putString("packaged_item", Registry.ITEM.getId(contents.getItem()).toString());
-		if (contents.getTag() != null) {
-			ct.put("packaged_tag", contents.getTag().copy());
+		NbtCompound ct = is.getOrCreateNbt();
+		ct.putString("packaged_item", Registries.ITEM.getId(contents.getItem()).toString());
+		if (contents.getNbt() != null) {
+			ct.put("packaged_tag", contents.getNbt().copy());
 		}
 		return is;
 	}

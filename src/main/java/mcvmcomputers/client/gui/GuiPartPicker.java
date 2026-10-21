@@ -1,5 +1,7 @@
 package mcvmcomputers.client.gui;
 
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.text.Text;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -21,8 +23,6 @@ import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.item.ItemStack;
 import net.minecraft.network.PacketByteBuf;
-import net.minecraft.text.LiteralText;
-import net.minecraft.text.TranslatableText;
 import net.minecraft.util.Language;
 
 /** Lists the parts of one kind in the player's inventory, marking which fit this PC. */
@@ -39,7 +39,7 @@ public class GuiPartPicker extends Screen {
 	private final List<Object[]> labels = new ArrayList<>();
 
 	public GuiPartPicker(Screen parent, EntityPC pc, Filter filter) {
-		super(new TranslatableText("mcvmcomputers.picker.title"));
+		super(Text.translatable("mcvmcomputers.picker.title"));
 		this.parent = parent;
 		this.pc = pc;
 		this.filter = filter;
@@ -120,18 +120,17 @@ public class GuiPartPicker extends Screen {
 
 	private void install(int slot) {
 		PacketByteBuf b = PacketByteBufs.create();
-		b.writeInt(pc.getEntityId());
+		b.writeInt(pc.getId());
 		b.writeInt(slot);
 		ClientPlayNetworking.send(PacketList.C2S_INSTALL_PART, b);
-		MinecraftClient.getInstance().openScreen(parent);
+		MinecraftClient.getInstance().setScreen(parent);
 	}
 
 	@Override
 	protected void init() {
-		this.buttons.clear();
-		this.children.clear();
+		this.clearChildren();
 		labels.clear();
-		PlayerInventory inv = MinecraftClient.getInstance().player.inventory;
+		PlayerInventory inv = MinecraftClient.getInstance().player.getInventory();
 		int x = this.width / 2 - 150;
 		int y = 40 - scroll;
 		int count = 0;
@@ -149,7 +148,7 @@ public class GuiPartPicker extends Screen {
 				if (why != null) {
 					labels.add(new Object[] { x + 8, y + 12, 0xff5555, why });
 				}
-				ButtonWidget b = this.addButton(WideButton.of(x + 240, y, 60, 12, new LiteralText(lang.get("mcvmcomputers.pc_editing.install")),
+				ButtonWidget b = this.addDrawableChild(WideButton.of(x + 240, y, 60, 12, Text.literal(lang.get("mcvmcomputers.pc_editing.install")),
 						w -> install(slot)));
 				b.active = why == null;
 			}
@@ -158,8 +157,8 @@ public class GuiPartPicker extends Screen {
 		if (count == 0) {
 			labels.add(new Object[] { x, 44, 0xaaaaaa, lang.get(filter == Filter.HARD_DISK ? "mcvmcomputers.picker.none_hdd" : "mcvmcomputers.picker.none") });
 		}
-		this.addButton(WideButton.of(this.width / 2 - 40, this.height - 28, 80, 20, new LiteralText(lang.get("gui.back")),
-				w -> MinecraftClient.getInstance().openScreen(parent)));
+		this.addDrawableChild(WideButton.of(this.width / 2 - 40, this.height - 28, 80, 20, Text.literal(lang.get("gui.back")),
+				w -> MinecraftClient.getInstance().setScreen(parent)));
 	}
 
 	@Override
@@ -170,23 +169,23 @@ public class GuiPartPicker extends Screen {
 	}
 
 	@Override
-	public void render(MatrixStack ms, int mouseX, int mouseY, float delta) {
+	public void render(DrawContext ms, int mouseX, int mouseY, float delta) {
 		this.renderBackground(ms);
 		String title = lang.get("mcvmcomputers.picker." + filter.name().toLowerCase(java.util.Locale.ROOT));
-		this.textRenderer.draw(ms, title, this.width / 2 - this.textRenderer.getWidth(title) / 2, 16, 0xffffff);
+		ms.drawText(this.textRenderer, title, (int) (this.width / 2 - this.textRenderer.getWidth(title) / 2), 16, 0xffffff, false);
 		for (Object[] l : labels) {
-			this.textRenderer.draw(ms, (String) l[3], (int) l[0], (int) l[1], (int) l[2]);
+			ms.drawText(this.textRenderer, (String) l[3], (int) ((int) l[0]), (int) ((int) l[1]), (int) l[2], false);
 		}
 		super.render(ms, mouseX, mouseY, delta);
 	}
 
 	@Override
-	public void onClose() {
-		MinecraftClient.getInstance().openScreen(parent);
+	public void close() {
+		MinecraftClient.getInstance().setScreen(parent);
 	}
 
 	@Override
-	public boolean isPauseScreen() {
+	public boolean shouldPause() {
 		return false;
 	}
 }

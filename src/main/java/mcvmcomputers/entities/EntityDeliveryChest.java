@@ -1,5 +1,6 @@
 package mcvmcomputers.entities;
 
+import net.minecraft.text.Text;
 import java.util.UUID;
 
 import mcvmcomputers.MainMod;
@@ -17,15 +18,16 @@ import net.minecraft.entity.data.TrackedDataHandlerRegistry;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.Packet;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.listener.ClientPlayPacketListener;
 import net.minecraft.network.packet.s2c.play.EntitySpawnS2CPacket;
-import net.minecraft.text.TranslatableText;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Hand;
 import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.registry.Registry;
+import net.minecraft.registry.Registry;
+import net.minecraft.registry.Registries;
 import net.minecraft.world.World;
 
 public class EntityDeliveryChest extends Entity{
@@ -68,7 +70,7 @@ public class EntityDeliveryChest extends Entity{
 		this.getDataTracker().set(TARGET_Y, (float)target.y);
 		this.getDataTracker().set(TARGET_Z, (float)target.z);
 		this.getDataTracker().set(DELIVERY_UUID, owner.toString());
-		this.updatePosition(target.x, target.y, target.z);
+		this.setPosition(target.x, target.y, target.z);
 	}
 	
 	public EntityDeliveryChest(World world, double targetX, double targetY, double targetZ) {
@@ -76,7 +78,7 @@ public class EntityDeliveryChest extends Entity{
 		this.getDataTracker().set(TARGET_X, (float)targetX);
 		this.getDataTracker().set(TARGET_Y, (float)targetY);
 		this.getDataTracker().set(TARGET_Z, (float)targetZ);
-		this.updatePosition(targetX, targetY, targetZ);
+		this.setPosition(targetX, targetY, targetZ);
 	}
 
 	@Override
@@ -89,14 +91,14 @@ public class EntityDeliveryChest extends Entity{
 	}
 	
 	@Override
-	protected void readCustomDataFromTag(CompoundTag tag) {
+	protected void readCustomDataFromNbt(NbtCompound tag) {
 		this.getDataTracker().set(TARGET_X, tag.getFloat("TargetX"));
 		this.getDataTracker().set(TARGET_Y, tag.getFloat("TargetY"));
 		this.getDataTracker().set(TARGET_Z, tag.getFloat("TargetZ"));
 		this.getDataTracker().set(DELIVERY_UUID, tag.getString("DeliveryUUID"));
 	}
 	@Override
-	protected void writeCustomDataToTag(CompoundTag tag) {
+	protected void writeCustomDataToNbt(NbtCompound tag) {
 		tag.putFloat("TargetX", this.getDataTracker().get(TARGET_X));
 		tag.putFloat("TargetY", this.getDataTracker().get(TARGET_Y));
 		tag.putFloat("TargetZ", this.getDataTracker().get(TARGET_Z));
@@ -106,7 +108,7 @@ public class EntityDeliveryChest extends Entity{
 	@Override
 	public void tick() {
 		super.tick();
-		if(!this.world.isClient) {
+		if(!this.getWorld().isClient) {
 			if(this.getDeliveryUUID().isEmpty()) {
 				this.kill();
 			}
@@ -131,7 +133,7 @@ public class EntityDeliveryChest extends Entity{
 	
 	@Override
 	public ActionResult interact(PlayerEntity player, Hand hand) {
-		if(player.world.isClient) {
+		if(player.getWorld().isClient) {
 			return ActionResult.FAIL;
 		}
 		if(hand == Hand.OFF_HAND) {
@@ -156,7 +158,7 @@ public class EntityDeliveryChest extends Entity{
 				}
 				
 				if(!flag) {
-					player.sendMessage(new TranslatableText("mcvmcomputers.click_with_ingots").formatted(Formatting.RED), false);
+					player.sendMessage(Text.translatable("mcvmcomputers.click_with_ingots").formatted(Formatting.RED), false);
 				}else {
 					if(to.price < 0) {
 						is.increment(to.price * -1);
@@ -168,7 +170,7 @@ public class EntityDeliveryChest extends Entity{
 				
 				return flag ? ActionResult.SUCCESS : ActionResult.FAIL;
 			}else if(to.currentStatus == OrderStatus.ORDER_CHEST_ARRIVED) {
-				player.world.spawnEntity(new ItemEntity(player.world, this.getX(), this.getY()+1.5, this.getZ(), ItemPackage.createPackage(to.items.get(0))));
+				player.getWorld().spawnEntity(new ItemEntity(player.getWorld(), this.getX(), this.getY()+1.5, this.getZ(), ItemPackage.createPackage(to.items.get(0))));
 				to.items.remove(0);
 				if(to.items.size() == 0) {
 					to.currentStatus = OrderStatus.ORDER_CHEST_RECEIVED;
@@ -201,19 +203,19 @@ public class EntityDeliveryChest extends Entity{
 	}
 
 	@Override
-	public Packet<?> createSpawnPacket() {
+	public Packet<ClientPlayPacketListener> createSpawnPacket() {
 		return new EntitySpawnS2CPacket(this);
 	}
 	
 	@Override
-	public boolean collides() {
+	public boolean canHit() {
 		return true;
 	}
 	
 	@Override
-	public void remove() {
-		super.remove();
-		if(world.isClient) {
+	public void onRemoved() {
+		super.onRemoved();
+		if(getWorld().isClient) {
 			ClientMod.currentDeliveryChest = this;
 			MainMod.deliveryChestSound.run();
 		}

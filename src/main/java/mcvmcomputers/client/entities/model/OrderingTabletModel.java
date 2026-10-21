@@ -2,6 +2,12 @@ package mcvmcomputers.client.entities.model;
 
 import mcvmcomputers.utils.MVCUtils;
 import net.minecraft.client.model.ModelPart;
+import net.minecraft.client.model.ModelData;
+import net.minecraft.client.model.ModelPartData;
+import net.minecraft.client.model.ModelPartBuilder;
+import net.minecraft.client.model.ModelTransform;
+import net.minecraft.client.model.Dilation;
+import net.minecraft.client.model.TexturedModelData;
 import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.render.entity.model.EntityModel;
 import net.minecraft.client.util.math.MatrixStack;
@@ -17,80 +23,24 @@ public class OrderingTabletModel extends EntityModel<Entity> {
 	private final ModelPart enter;
 
 	public OrderingTabletModel() {
-		textureWidth = 64;
-		textureHeight = 64;
 
-		tablet = new ModelPart(this);
-		tablet.setPivot(0.0F, 24.0F, 0.0F);
-		tablet.setTextureOffset(24, 19).addCuboid(-6.0F, -2.0F, -6.0F, 12.0F, 1.0F, 1.0F, 0.0F, false);
-		tablet.setTextureOffset(24, 24).addCuboid(-6.0F, -2.0F, 5.0F, 12.0F, 1.0F, 1.0F, 0.0F, false);
-		tablet.setTextureOffset(12, 20).addCuboid(5.0F, -2.0F, -5.0F, 1.0F, 1.0F, 10.0F, 0.0F, false);
-		tablet.setTextureOffset(0, 19).addCuboid(-6.0F, -2.0F, -5.0F, 1.0F, 1.0F, 10.0F, 0.0F, false);
-		tablet.setTextureOffset(0, 0).addCuboid(-6.0F, -1.0F, -6.0F, 12.0F, 1.0F, 12.0F, 0.0F, false);
-		
-		/*
-		buttons = new ModelPart(this);
-		buttons.setPivot(0.0F, -3.4F, -7.1F);
-		tablet.addChild(buttons);
-		setRotationAngle(buttons, -0.7854F, 0.0F, 0.0F);
-		buttons.setTextureOffset(0, 13).addCuboid(-6.0F, -0.5F, -2.5F, 12.0F, 1.0F, 5.0F, 0.0F, false);
-
-		up = new ModelPart(this);
-		up.setPivot(-2.0F, -0.5F, 1.0657F);
-		buttons.addChild(up);
-		up.setTextureOffset(4, 6).addCuboid(-0.5F, -0.5F, -0.5F, 1.0F, 1.0F, 1.0F, 0.0F, false);
-
-		down = new ModelPart(this);
-		down.setPivot(-2.0F, -0.5F, -1.1971F);
-		buttons.addChild(down);
-		down.setTextureOffset(0, 6).addCuboid(-0.5F, -0.5F, -0.5F, 1.0F, 1.0F, 1.0F, 0.0F, false);
-
-		left = new ModelPart(this);
-		left.setPivot(-3.1F, -0.5F, -0.0657F);
-		buttons.addChild(left);
-		left.setTextureOffset(4, 4).addCuboid(-0.5F, -0.5F, -0.5F, 1.0F, 1.0F, 1.0F, 0.0F, false);
-
-		right = new ModelPart(this);
-		right.setPivot(-0.9F, -0.5F, -0.0657F);
-		buttons.addChild(right);
-		right.setTextureOffset(0, 4).addCuboid(-0.5F, -0.5F, -0.5F, 1.0F, 1.0F, 1.0F, 0.0F, false);
-
-		enter = new ModelPart(this);
-		enter.setPivot(2.4F, -0.5F, -0.0657F);
-		buttons.addChild(enter);
-		enter.setTextureOffset(0, 0).addCuboid(-1.0F, -0.5F, -1.5F, 2.0F, 1.0F, 3.0F, 0.0F, false);
-		*/
-		
-		buttons = new ModelPart(this);
-		buttons.setPivot(0.0F, -2.0F, -6.0F);
-		tablet.addChild(buttons);
-		setRotationAngle(buttons, -0.7854F, 0.0F, 0.0F);
-		buttons.setTextureOffset(0, 13).addCuboid(-6.0F, -0.6979F, -4.3F, 12.0F, 1.0F, 5.0F, 0.0F, false);
-
-		up = new ModelPart(this);
-		up.setPivot(-2.5F, -0.9F, -0.8243F);
-		buttons.addChild(up);
-		up.setTextureOffset(4, 6).addCuboid(-0.5F, -0.4F, -0.5F, 1.0F, 1.0F, 1.0F, 0.0F, false);
-
-		down = new ModelPart(this);
-		down.setPivot(-2.5F, -0.8393F, -2.792F);
-		buttons.addChild(down);
-		down.setTextureOffset(0, 6).addCuboid(-0.5F, -0.5F, -0.5F, 1.0F, 1.0F, 1.0F, 0.0F, false);
-
-		left = new ModelPart(this);
-		left.setPivot(-3.5F, -0.8393F, -1.8021F);
-		buttons.addChild(left);
-		left.setTextureOffset(4, 4).addCuboid(-0.5F, -0.5F, -0.5F, 1.0F, 1.0F, 1.0F, 0.0F, false);
-
-		right = new ModelPart(this);
-		right.setPivot(-1.5F, -0.8393F, -1.8021F);
-		buttons.addChild(right);
-		right.setTextureOffset(0, 4).addCuboid(-0.5F, -0.5F, -0.5F, 1.0F, 1.0F, 1.0F, 0.0F, false);
-
-		enter = new ModelPart(this);
-		enter.setPivot(3.0F, -1.1222F, -1.8021F);
-		buttons.addChild(enter);
-		enter.setTextureOffset(0, 0).addCuboid(-1.0F, -0.5F, -1.5F, 2.0F, 1.0F, 3.0F, 0.0F, false);
+		ModelData modelData = new ModelData();
+		ModelPartData modelRoot = modelData.getRoot();
+		ModelPartData tabletData = modelRoot.addChild("tablet", ModelPartBuilder.create().mirrored(false).uv(24, 19).cuboid(-6.0F, -2.0F, -6.0F, 12.0F, 1.0F, 1.0F, new Dilation(0.0F)).mirrored(false).uv(24, 24).cuboid(-6.0F, -2.0F, 5.0F, 12.0F, 1.0F, 1.0F, new Dilation(0.0F)).mirrored(false).uv(12, 20).cuboid(5.0F, -2.0F, -5.0F, 1.0F, 1.0F, 10.0F, new Dilation(0.0F)).mirrored(false).uv(0, 19).cuboid(-6.0F, -2.0F, -5.0F, 1.0F, 1.0F, 10.0F, new Dilation(0.0F)).mirrored(false).uv(0, 0).cuboid(-6.0F, -1.0F, -6.0F, 12.0F, 1.0F, 12.0F, new Dilation(0.0F)), ModelTransform.of(0.0F, 24.0F, 0.0F, 0.0F, 0.0F, 0.0F));
+		ModelPartData buttonsData = tabletData.addChild("buttons", ModelPartBuilder.create().mirrored(false).uv(0, 13).cuboid(-6.0F, -0.6979F, -4.3F, 12.0F, 1.0F, 5.0F, new Dilation(0.0F)), ModelTransform.of(0.0F, -2.0F, -6.0F, -0.7854F, 0.0F, 0.0F));
+		ModelPartData upData = buttonsData.addChild("up", ModelPartBuilder.create().mirrored(false).uv(4, 6).cuboid(-0.5F, -0.4F, -0.5F, 1.0F, 1.0F, 1.0F, new Dilation(0.0F)), ModelTransform.of(-2.5F, -0.9F, -0.8243F, 0.0F, 0.0F, 0.0F));
+		ModelPartData downData = buttonsData.addChild("down", ModelPartBuilder.create().mirrored(false).uv(0, 6).cuboid(-0.5F, -0.5F, -0.5F, 1.0F, 1.0F, 1.0F, new Dilation(0.0F)), ModelTransform.of(-2.5F, -0.8393F, -2.792F, 0.0F, 0.0F, 0.0F));
+		ModelPartData leftData = buttonsData.addChild("left", ModelPartBuilder.create().mirrored(false).uv(4, 4).cuboid(-0.5F, -0.5F, -0.5F, 1.0F, 1.0F, 1.0F, new Dilation(0.0F)), ModelTransform.of(-3.5F, -0.8393F, -1.8021F, 0.0F, 0.0F, 0.0F));
+		ModelPartData rightData = buttonsData.addChild("right", ModelPartBuilder.create().mirrored(false).uv(0, 4).cuboid(-0.5F, -0.5F, -0.5F, 1.0F, 1.0F, 1.0F, new Dilation(0.0F)), ModelTransform.of(-1.5F, -0.8393F, -1.8021F, 0.0F, 0.0F, 0.0F));
+		ModelPartData enterData = buttonsData.addChild("enter", ModelPartBuilder.create().mirrored(false).uv(0, 0).cuboid(-1.0F, -0.5F, -1.5F, 2.0F, 1.0F, 3.0F, new Dilation(0.0F)), ModelTransform.of(3.0F, -1.1222F, -1.8021F, 0.0F, 0.0F, 0.0F));
+		ModelPart modelBuilt = TexturedModelData.of(modelData, 64, 64).createModel();
+		tablet = modelBuilt.getChild("tablet");
+		buttons = modelBuilt.getChild("tablet").getChild("buttons");
+		up = modelBuilt.getChild("tablet").getChild("buttons").getChild("up");
+		down = modelBuilt.getChild("tablet").getChild("buttons").getChild("down");
+		left = modelBuilt.getChild("tablet").getChild("buttons").getChild("left");
+		right = modelBuilt.getChild("tablet").getChild("buttons").getChild("right");
+		enter = modelBuilt.getChild("tablet").getChild("buttons").getChild("enter");
 	}
 
 	@Override

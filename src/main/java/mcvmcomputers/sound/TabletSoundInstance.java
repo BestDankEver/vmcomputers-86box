@@ -7,7 +7,7 @@ import net.minecraft.sound.SoundEvent;
 public class TabletSoundInstance extends AbstractSoundInstance{
 	
 	public TabletSoundInstance(SoundEvent soundId) {
-		super(soundId, SoundCategory.MASTER);
+		super(soundId, SoundCategory.MASTER, net.minecraft.client.sound.SoundInstance.createRandom());
 	}
 	
 	@Override
@@ -22,7 +22,7 @@ public class TabletSoundInstance extends AbstractSoundInstance{
 	
 	@Override
 	public float getVolume() {
-		return .15F * this.sound.getVolume();
+		return .15F * super.getVolume();
 	}
 
 }

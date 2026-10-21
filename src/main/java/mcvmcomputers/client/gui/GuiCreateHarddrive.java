@@ -1,5 +1,7 @@
 package mcvmcomputers.client.gui;
 
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.text.Text;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -23,8 +25,6 @@ import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.network.PacketByteBuf;
-import net.minecraft.text.LiteralText;
-import net.minecraft.text.TranslatableText;
 import net.minecraft.util.Language;
 import net.minecraft.util.Util;
 
@@ -86,7 +86,7 @@ public class GuiCreateHarddrive extends Screen {
 	private final MinecraftClient minecraft = MinecraftClient.getInstance();
 
 	public GuiCreateHarddrive() {
-		super(new TranslatableText("mcvmcomputers.vhd_setup.title"));
+		super(Text.translatable("mcvmcomputers.vhd_setup.title"));
 	}
 
 	private String translation(String in) {
@@ -95,13 +95,12 @@ public class GuiCreateHarddrive extends Screen {
 
 	private ButtonWidget centered(int y, String text, ButtonWidget.PressAction a) {
 		int w = textRenderer.getWidth(text) + 40;
-		return this.addButton(WideButton.of(this.width / 2 - w / 2, y, w, 20, new LiteralText(text), a));
+		return this.addDrawableChild(WideButton.of(this.width / 2 - w / 2, y, w, 20, Text.literal(text), a));
 	}
 
 	@Override
 	public void init() {
-		this.buttons.clear();
-		this.children.clear();
+		this.clearChildren();
 		fields.clear();
 		labels.clear();
 		if (state == State.CREATE_NEW) {
@@ -117,9 +116,9 @@ public class GuiCreateHarddrive extends Screen {
 					String name = f.getName();
 					int[] vhd = DiskImages.readVhd(f);
 					String label = name + "  |  " + (vhd != null ? vhd[3] + " MB, " + vhd[0] + "/" + vhd[1] + "/" + vhd[2] : (f.length() / 1024 / 1024) + " MB");
-					this.addButton(WideButton.of(this.width / 2 - 140, y, 260, 14, new LiteralText(this.textRenderer.trimToWidth(label, 254)),
+					this.addDrawableChild(WideButton.of(this.width / 2 - 140, y, 260, 14, Text.literal(this.textRenderer.trimToWidth(label, 254)),
 							b -> select(existing(f))));
-					this.addButton(WideButton.of(this.width / 2 + 122, y, 14, 14, new LiteralText("x"), b -> {
+					this.addDrawableChild(WideButton.of(this.width / 2 + 122, y, 14, 14, Text.literal("x"), b -> {
 						if (hasShiftDown()) {
 							f.delete();
 							init();
@@ -135,11 +134,11 @@ public class GuiCreateHarddrive extends Screen {
 	// ---- New disk -------------------------------------------------------------------
 
 	private TextFieldWidget field(int x, int y, int w, String text, int maxLen) {
-		TextFieldWidget f = new TextFieldWidget(this.textRenderer, x, y, w, 18, new LiteralText(""));
+		TextFieldWidget f = new TextFieldWidget(this.textRenderer, x, y, w, 18, Text.literal(""));
 		f.setMaxLength(maxLen);
 		f.setText(text);
 		f.setChangedListener(s -> validate());
-		this.children.add(f);
+		this.addSelectableChild(f);
 		fields.add(f);
 		return f;
 	}
@@ -162,7 +161,7 @@ public class GuiCreateHarddrive extends Screen {
 		y += ROW;
 
 		label(lx, y + 6, "Image format");
-		this.addButton(WideButton.of(cx, y, cw, 20, new LiteralText(format.label), b -> {
+		this.addDrawableChild(WideButton.of(cx, y, cw, 20, Text.literal(format.label), b -> {
 			format = Format.values()[Math.floorMod(format.ordinal() + (hasShiftDown() ? -1 : 1), Format.values().length)];
 			init();
 		}));
@@ -170,20 +169,20 @@ public class GuiCreateHarddrive extends Screen {
 
 		if (format == Format.VHD_DIFF) {
 			label(lx, y + 6, "Based on");
-			this.addButton(WideButton.of(cx, y, cw, 20, new LiteralText(parent.isEmpty() ? "Pick a VHD..." : parent), b -> pickParent()));
+			this.addDrawableChild(WideButton.of(cx, y, cw, 20, Text.literal(parent.isEmpty() ? "Pick a VHD..." : parent), b -> pickParent()));
 			y += ROW;
 			label(lx, y + 4, "Stores only the changes; the base disk must stay unchanged.");
 			y += 14;
 		} else {
 			label(lx, y + 6, "Made for");
-			this.addButton(WideButton.of(cx, y, cw, 20, new LiteralText(iface.label), b -> {
+			this.addDrawableChild(WideButton.of(cx, y, cw, 20, Text.literal(iface.label), b -> {
 				iface = Interface.values()[Math.floorMod(iface.ordinal() + (hasShiftDown() ? -1 : 1), Interface.values().length)];
 				init();
 			}));
 			y += ROW;
 
 			label(lx, y + 6, "Size");
-			this.addButton(WideButton.of(cx, y, cw, 20, new LiteralText(sizeMode.label), b -> {
+			this.addDrawableChild(WideButton.of(cx, y, cw, 20, Text.literal(sizeMode.label), b -> {
 				sizeMode = SizeMode.values()[Math.floorMod(sizeMode.ordinal() + (hasShiftDown() ? -1 : 1), SizeMode.values().length)];
 				init();
 			}));
@@ -197,7 +196,7 @@ public class GuiCreateHarddrive extends Screen {
 				typeIndex = Math.max(0, Math.min(typeIndex, types.size() - 1));
 				String t = types.isEmpty() ? "(needs the parts catalog)" : typeLabel(typeIndex, types.get(typeIndex));
 				label(lx, y + 6, "Drive type");
-				this.addButton(WideButton.of(cx, y, cw, 20, new LiteralText(this.textRenderer.trimToWidth(t + "  ...", cw - 8)), b -> pickType(types)));
+				this.addDrawableChild(WideButton.of(cx, y, cw, 20, Text.literal(this.textRenderer.trimToWidth(t + "  ...", cw - 8)), b -> pickType(types)));
 			} else {
 				label(lx, y + 5, "Cyl / heads / sectors");
 				cylField = field(cx, y, 60, cylText, 6);
@@ -209,7 +208,7 @@ public class GuiCreateHarddrive extends Screen {
 
 		label(lx, y + 6, "Drive model");
 		String modelLabel = model.isEmpty() ? lang.get("mcvmcomputers.hdd.model_default") : (cat == null ? model : cat.hddModelName(model));
-		this.addButton(WideButton.of(cx, y, cw, 20, new LiteralText(this.textRenderer.trimToWidth(modelLabel + "  ...", cw - 8)), b -> pickModel(cat)));
+		this.addDrawableChild(WideButton.of(cx, y, cw, 20, Text.literal(this.textRenderer.trimToWidth(modelLabel + "  ...", cw - 8)), b -> pickModel(cat)));
 		y += ROW + 4;
 
 		statusY = y;
@@ -233,7 +232,7 @@ public class GuiCreateHarddrive extends Screen {
 				choices.add(new String[] { "" + i, typeLabel(i, t) });
 			}
 		}
-		minecraft.openScreen(new GuiChoicePicker(this, "Standard drive types (" + iface.label + ")", choices, "" + typeIndex,
+		minecraft.setScreen(new GuiChoicePicker(this, "Standard drive types (" + iface.label + ")", choices, "" + typeIndex,
 				v -> typeIndex = Integer.parseInt(v)));
 	}
 
@@ -243,7 +242,7 @@ public class GuiCreateHarddrive extends Screen {
 		if (cat != null) {
 			choices.addAll(cat.hddModels);
 		}
-		minecraft.openScreen(new GuiChoicePicker(this, lang.get("mcvmcomputers.hdd.model"), choices, model, v -> model = v));
+		minecraft.setScreen(new GuiChoicePicker(this, lang.get("mcvmcomputers.hdd.model"), choices, model, v -> model = v));
 	}
 
 	private void pickParent() {
@@ -254,7 +253,7 @@ public class GuiCreateHarddrive extends Screen {
 				choices.add(new String[] { f.getName(), f.getName() + "  (" + g[3] + " MB)" });
 			}
 		}
-		minecraft.openScreen(new GuiChoicePicker(this, "Base disk", choices, parent, v -> parent = v));
+		minecraft.setScreen(new GuiChoicePicker(this, "Base disk", choices, parent, v -> parent = v));
 	}
 
 	/** Works out the geometry from the fields and says whether the disk can be made. */
@@ -380,7 +379,7 @@ public class GuiCreateHarddrive extends Screen {
 
 	private void menuButton() {
 		int w = textRenderer.getWidth(translation("mcvmcomputers.vhd_setup.menu")) + 40;
-		this.addButton(WideButton.of(this.width - (w + 10), this.height - 30, w, 20, new LiteralText(translation("mcvmcomputers.vhd_setup.menu")),
+		this.addDrawableChild(WideButton.of(this.width - (w + 10), this.height - 30, w, 20, Text.literal(translation("mcvmcomputers.vhd_setup.menu")),
 				b -> switchState(State.MENU)));
 	}
 
@@ -417,7 +416,7 @@ public class GuiCreateHarddrive extends Screen {
 		pb.writeString(d.format);
 		pb.writeString(d.parent);
 		ClientPlayNetworking.send(PacketList.C2S_CHANGE_HDD, pb);
-		minecraft.openScreen(null);
+		minecraft.setScreen(null);
 	}
 
 	@Override
@@ -438,23 +437,23 @@ public class GuiCreateHarddrive extends Screen {
 	}
 
 	@Override
-	public void render(MatrixStack ms, int mouseX, int mouseY, float delta) {
+	public void render(DrawContext ms, int mouseX, int mouseY, float delta) {
 		this.renderBackground(ms);
 		if (state == State.CREATE_NEW) {
 			for (Object[] l : labels) {
-				this.textRenderer.draw(ms, (String) l[2], (int) l[0], (int) l[1], 0xdddddd);
+				ms.drawText(this.textRenderer, (String) l[2], (int) ((int) l[0]), (int) ((int) l[1]), 0xdddddd, false);
 			}
 			for (TextFieldWidget f : fields) {
 				f.render(ms, mouseX, mouseY, delta);
 			}
 			int lx = Math.max(6, this.width / 2 - 190);
-			this.textRenderer.draw(ms, this.textRenderer.trimToWidth(status, this.width - lx - 6), lx, statusY, -1);
+			ms.drawText(this.textRenderer, this.textRenderer.trimToWidth(status, this.width - lx - 6), (int) (lx), (int) (statusY), -1, false);
 		} else if (state == State.MENU) {
 			String s = translation("mcvmcomputers.vhd_setup.setupnewvhd");
-			this.textRenderer.draw(ms, s, this.width / 2 - this.textRenderer.getWidth(s) / 2, this.height / 2 - 30, -1);
+			ms.drawText(this.textRenderer, s, (int) (this.width / 2 - this.textRenderer.getWidth(s) / 2), (int) (this.height / 2 - 30), -1, false);
 		} else {
 			String s = translation("mcvmcomputers.vhd_setup.delete_hint");
-			this.textRenderer.draw(ms, s, this.width / 2 - this.textRenderer.getWidth(s) / 2, 40, 0xaaaaaa);
+			ms.drawText(this.textRenderer, s, (int) (this.width / 2 - this.textRenderer.getWidth(s) / 2), 40, 0xaaaaaa, false);
 		}
 		super.render(ms, mouseX, mouseY, delta);
 	}

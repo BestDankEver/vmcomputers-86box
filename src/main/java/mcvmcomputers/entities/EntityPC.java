@@ -1,5 +1,6 @@
 package mcvmcomputers.entities;
 
+import net.minecraft.text.Text;
 import java.util.UUID;
 
 import mcvmcomputers.MainMod;
@@ -15,10 +16,10 @@ import net.minecraft.entity.data.DataTracker;
 import net.minecraft.entity.data.TrackedData;
 import net.minecraft.entity.data.TrackedDataHandlerRegistry;
 import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.Packet;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.listener.ClientPlayPacketListener;
 import net.minecraft.network.packet.s2c.play.EntitySpawnS2CPacket;
-import net.minecraft.text.TranslatableText;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Hand;
@@ -29,14 +30,14 @@ public class EntityPC extends Entity {
 	private static final TrackedData<String> OWNER_UUID = DataTracker.registerData(EntityPC.class, TrackedDataHandlerRegistry.STRING);
 	/** Stable identity of this computer; names its 86Box folder, so BIOS settings survive moving it. */
 	private static final TrackedData<String> PC_ID = DataTracker.registerData(EntityPC.class, TrackedDataHandlerRegistry.STRING);
-	private static final TrackedData<CompoundTag> HARDWARE = DataTracker.registerData(EntityPC.class, TrackedDataHandlerRegistry.TAG_COMPOUND);
+	private static final TrackedData<NbtCompound> HARDWARE = DataTracker.registerData(EntityPC.class, TrackedDataHandlerRegistry.NBT_COMPOUND);
 
 	private static final TrackedData<Float> LOOK_AT_POS_X = DataTracker.registerData(EntityPC.class, TrackedDataHandlerRegistry.FLOAT);
 	private static final TrackedData<Float> LOOK_AT_POS_Y = DataTracker.registerData(EntityPC.class, TrackedDataHandlerRegistry.FLOAT);
 	private static final TrackedData<Float> LOOK_AT_POS_Z = DataTracker.registerData(EntityPC.class, TrackedDataHandlerRegistry.FLOAT);
 	private static final TrackedData<Boolean> GLASS_SIDEPANEL = DataTracker.registerData(EntityPC.class, TrackedDataHandlerRegistry.BOOLEAN);
 
-	private CompoundTag cachedTag;
+	private NbtCompound cachedTag;
 	private HardwareSpec cachedSpec;
 
 	public EntityPC(EntityType<?> type, World world) {
@@ -45,13 +46,13 @@ public class EntityPC extends Entity {
 
 	public EntityPC(World world, double x, double y, double z) {
 		this(EntityList.PC, world);
-		this.updatePosition(x, y, z);
+		this.setPosition(x, y, z);
 	}
 
 	/** @param itemTag NBT of the PC item being placed (carries the hardware of a built PC), or null. */
-	public EntityPC(World world, double x, double y, double z, Vec3d lookAt, UUID owner, CompoundTag itemTag) {
+	public EntityPC(World world, double x, double y, double z, Vec3d lookAt, UUID owner, NbtCompound itemTag) {
 		this(EntityList.PC, world);
-		this.updatePosition(x, y, z);
+		this.setPosition(x, y, z);
 		this.getDataTracker().set(LOOK_AT_POS_X, (float) lookAt.x);
 		this.getDataTracker().set(LOOK_AT_POS_Y, (float) lookAt.y);
 		this.getDataTracker().set(LOOK_AT_POS_Z, (float) lookAt.z);
@@ -68,7 +69,7 @@ public class EntityPC extends Entity {
 		this.getDataTracker().set(PC_ID, id);
 	}
 
-	public EntityPC(World world, double x, double y, double z, Vec3d lookAt, UUID owner, boolean glassSidepanel, CompoundTag itemTag) {
+	public EntityPC(World world, double x, double y, double z, Vec3d lookAt, UUID owner, boolean glassSidepanel, NbtCompound itemTag) {
 		this(world, x, y, z, lookAt, owner, itemTag);
 		this.getDataTracker().set(GLASS_SIDEPANEL, glassSidepanel);
 	}
@@ -81,7 +82,7 @@ public class EntityPC extends Entity {
 	protected void initDataTracker() {
 		this.getDataTracker().startTracking(OWNER_UUID, "");
 		this.getDataTracker().startTracking(PC_ID, "");
-		this.getDataTracker().startTracking(HARDWARE, new CompoundTag());
+		this.getDataTracker().startTracking(HARDWARE, new NbtCompound());
 		this.getDataTracker().startTracking(LOOK_AT_POS_X, 0f);
 		this.getDataTracker().startTracking(LOOK_AT_POS_Y, 0f);
 		this.getDataTracker().startTracking(LOOK_AT_POS_Z, 0f);
@@ -89,7 +90,7 @@ public class EntityPC extends Entity {
 	}
 
 	@Override
-	protected void readCustomDataFromTag(CompoundTag tag) {
+	protected void readCustomDataFromNbt(NbtCompound tag) {
 		this.getDataTracker().set(LOOK_AT_POS_X, tag.getFloat("LookAtX"));
 		this.getDataTracker().set(LOOK_AT_POS_Y, tag.getFloat("LookAtY"));
 		this.getDataTracker().set(LOOK_AT_POS_Z, tag.getFloat("LookAtZ"));
@@ -101,7 +102,7 @@ public class EntityPC extends Entity {
 	}
 
 	@Override
-	protected void writeCustomDataToTag(CompoundTag tag) {
+	protected void writeCustomDataToNbt(NbtCompound tag) {
 		tag.putFloat("LookAtX", this.getDataTracker().get(LOOK_AT_POS_X));
 		tag.putFloat("LookAtY", this.getDataTracker().get(LOOK_AT_POS_Y));
 		tag.putFloat("LookAtZ", this.getDataTracker().get(LOOK_AT_POS_Z));
@@ -127,13 +128,13 @@ public class EntityPC extends Entity {
 		return this.getDataTracker().get(GLASS_SIDEPANEL);
 	}
 
-	public CompoundTag getHardwareTag() {
+	public NbtCompound getHardwareTag() {
 		return this.getDataTracker().get(HARDWARE);
 	}
 
 	/** The installed hardware. Don't modify the result; use {@link #setHardware}. */
 	public HardwareSpec getHardware() {
-		CompoundTag t = getHardwareTag();
+		NbtCompound t = getHardwareTag();
 		if (t != cachedTag || cachedSpec == null) {
 			cachedSpec = HardwareNbt.read(t);
 			cachedTag = t;
@@ -159,20 +160,20 @@ public class EntityPC extends Entity {
 		if (hand != Hand.MAIN_HAND) {
 			return ActionResult.PASS;
 		}
-		if (!player.world.isClient) {
+		if (!player.getWorld().isClient) {
 			if (player.isSneaking() && isOwnedBy(player)) {
 				if (MainMod.isRunning(this)) {
-					player.sendMessage(new TranslatableText("mcvmcomputers.turn_off_first").formatted(Formatting.RED), false);
+					player.sendMessage(Text.translatable("mcvmcomputers.turn_off_first").formatted(Formatting.RED), false);
 					return ActionResult.SUCCESS;
 				}
 				if (this.getGlassSidepanel()) {
-					player.world.spawnEntity(new ItemEntity(player.world, this.getPos().x, this.getPos().y, this.getPos().z,
+					player.getWorld().spawnEntity(new ItemEntity(player.getWorld(), this.getPos().x, this.getPos().y, this.getPos().z,
 							ItemPCCaseSidepanel.createPCStackByEntity(this)));
 				} else {
-					player.world.spawnEntity(new ItemEntity(player.world, this.getPos().x, this.getPos().y, this.getPos().z,
+					player.getWorld().spawnEntity(new ItemEntity(player.getWorld(), this.getPos().x, this.getPos().y, this.getPos().z,
 							ItemPCCase.createPCStackByEntity(this)));
 				}
-				this.remove();
+				this.discard();
 			}
 		} else {
 			if (!player.isSneaking()) {
@@ -180,7 +181,7 @@ public class EntityPC extends Entity {
 					ClientMod.currentPC = this;
 					MainMod.pcOpenGui.run();
 				} else {
-					player.sendMessage(new TranslatableText("mcvmcomputers.not_your_computer").formatted(Formatting.RED), false);
+					player.sendMessage(Text.translatable("mcvmcomputers.not_your_computer").formatted(Formatting.RED), false);
 				}
 			}
 		}
@@ -188,12 +189,12 @@ public class EntityPC extends Entity {
 	}
 
 	@Override
-	public boolean collides() {
+	public boolean canHit() {
 		return true;
 	}
 
 	@Override
-	public Packet<?> createSpawnPacket() {
+	public Packet<ClientPlayPacketListener> createSpawnPacket() {
 		return new EntitySpawnS2CPacket(this);
 	}
 }

@@ -1,19 +1,19 @@
 package mcvmcomputers.utils;
 
-import net.minecraft.util.math.Quaternion;
+import org.joml.Quaternionf;
 import net.minecraft.util.math.Vec3d;
 
 public class MVCUtils {
-	public static Quaternion lookAt(Vec3d src, Vec3d dest) {
+	public static Quaternionf lookAt(Vec3d src, Vec3d dest) {
 		Vec3d forward = new Vec3d(0,0,1);
 		Vec3d fwd = src.subtract(dest).normalize();
 		double dot = forward.dotProduct(fwd);
 		Vec3d up = new Vec3d(0,1,0);
 		if(Math.abs(dot - (-1.0f)) < 0.000001f) {
-			return new Quaternion((float)up.x, (float)up.y, (float)up.z, 3.1415926535897932f);
+			return new Quaternionf((float)up.x, (float)up.y, (float)up.z, 3.1415926535897932f);
 		}
 		if(Math.abs(dot - (1.0f)) < 0.000001f) {
-			return Quaternion.IDENTITY;
+			return new Quaternionf();
 		}
 		
 		double rotAngle = Math.acos(dot);
@@ -22,13 +22,18 @@ public class MVCUtils {
 		return createFromAxisAngle(rotAxis, rotAngle);
 	}
 	
-	public static Quaternion createFromAxisAngle(Vec3d axis, double angle) {
+	public static Quaternionf createFromAxisAngle(Vec3d axis, double angle) {
 		double halfAngle = angle * .5;
 	    float s = (float)Math.sin(halfAngle);
-	    Quaternion q = new Quaternion((float) axis.x * s, (float) axis.y * s, (float) axis.z * s, (float)Math.cos(halfAngle));
+	    Quaternionf q = new Quaternionf((float) axis.x * s, (float) axis.y * s, (float) axis.z * s, (float)Math.cos(halfAngle));
 	    return q;
 	}
 	
+	/** Rotation from Euler angles in degrees (X, then Y, then Z), like 1.16's Quaternion(x, y, z, true). */
+	public static Quaternionf euler(float x, float y, float z) {
+		return new Quaternionf().rotationXYZ((float) Math.toRadians(x), (float) Math.toRadians(y), (float) Math.toRadians(z));
+	}
+
 	public static float lerp(float a, float b, float t) {
 		return a + (b-a) * t;
 	}

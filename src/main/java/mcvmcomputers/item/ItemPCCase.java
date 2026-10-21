@@ -10,12 +10,10 @@ import mcvmcomputers.utils.HardwareNbt;
 import net.minecraft.client.item.TooltipContext;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtCompound;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
-import net.minecraft.text.LiteralText;
 import net.minecraft.text.Text;
-import net.minecraft.text.TranslatableText;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Hand;
@@ -37,10 +35,6 @@ public class ItemPCCase extends OrderableItem {
 		this.glass = glass;
 	}
 
-	@Override
-	public boolean shouldSyncTagToClient() {
-		return true;
-	}
 
 	@Override
 	public TypedActionResult<ItemStack> use(World world, PlayerEntity user, Hand hand) {
@@ -49,7 +43,7 @@ public class ItemPCCase extends OrderableItem {
 			return new TypedActionResult<>(ActionResult.PASS, stack);
 		}
 		if (!world.isClient) {
-			CompoundTag tag = stack.getTag() == null ? null : stack.getTag().copy();
+			NbtCompound tag = stack.getNbt() == null ? null : stack.getNbt().copy();
 			HitResult hr = user.raycast(10, 0f, false);
 			EntityPC pc = new EntityPC(world, hr.getPos().getX(), hr.getPos().getY(), hr.getPos().getZ(),
 					new Vec3d(user.getPos().x, hr.getPos().getY(), user.getPos().z), user.getUuid(), glass, tag);
@@ -63,7 +57,7 @@ public class ItemPCCase extends OrderableItem {
 	}
 
 	private static HardwareSpec specOf(ItemStack stack) {
-		CompoundTag t = stack.getTag();
+		NbtCompound t = stack.getNbt();
 		return (t != null && t.contains("Hardware", 10)) ? HardwareNbt.read(t.getCompound("Hardware")) : null;
 	}
 
@@ -74,19 +68,19 @@ public class ItemPCCase extends OrderableItem {
 			return;
 		}
 		if (s.motherboard != null) {
-			tooltip.add(new LiteralText(s.motherboard.name).formatted(Formatting.GRAY));
+			tooltip.add(Text.literal(s.motherboard.name).formatted(Formatting.GRAY));
 		}
 		if (s.cpu != null) {
-			tooltip.add(new LiteralText(s.cpu.name).formatted(Formatting.GRAY));
+			tooltip.add(Text.literal(s.cpu.name).formatted(Formatting.GRAY));
 		}
 		if (!s.ramKb.isEmpty()) {
-			tooltip.add(new TranslatableText("mcvmcomputers.pc_item_ram", HardwareSpec.ramLabel(s.totalRamKb())).formatted(Formatting.GRAY));
+			tooltip.add(Text.translatable("mcvmcomputers.pc_item_ram", HardwareSpec.ramLabel(s.totalRamKb())).formatted(Formatting.GRAY));
 		}
 		for (CardPart c : s.cards) {
-			tooltip.add(new LiteralText(c.name).formatted(Formatting.DARK_GRAY));
+			tooltip.add(Text.literal(c.name).formatted(Formatting.DARK_GRAY));
 		}
 		for (HardwareSpec.DiskPart d : s.hardDisks) {
-			tooltip.add(new TranslatableText("mcvmcomputers.pc_item_hdd", d.file).formatted(Formatting.DARK_GRAY));
+			tooltip.add(Text.translatable("mcvmcomputers.pc_item_hdd", d.file).formatted(Formatting.DARK_GRAY));
 		}
 	}
 
@@ -94,7 +88,7 @@ public class ItemPCCase extends OrderableItem {
 	public Text getName(ItemStack stack) {
 		HardwareSpec s = specOf(stack);
 		if (s != null && !s.isEmpty()) {
-			return new TranslatableText("mcvmcomputers.pc_item_built");
+			return Text.translatable("mcvmcomputers.pc_item_built");
 		}
 		return super.getName(stack);
 	}
@@ -105,7 +99,7 @@ public class ItemPCCase extends OrderableItem {
 
 	protected static ItemStack stackFor(EntityPC pc, OrderableItem item) {
 		ItemStack is = new ItemStack(item);
-		CompoundTag ct = is.getOrCreateTag();
+		NbtCompound ct = is.getOrCreateNbt();
 		ct.put("Hardware", pc.getHardwareTag().copy());
 		ct.putString("PcId", pc.getPcId());
 		return is;

@@ -5,17 +5,17 @@ import mcvmcomputers.item.PlacableOrderableItem;
 import mcvmcomputers.utils.MVCUtils;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.render.entity.EntityRenderDispatcher;
+import net.minecraft.client.render.entity.EntityRendererFactory;
 import net.minecraft.client.render.entity.EntityRenderer;
-import net.minecraft.client.render.model.json.ModelTransformation.Mode;
+import net.minecraft.client.render.model.json.ModelTransformationMode;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.Identifier;
-import net.minecraft.util.math.Quaternion;
+import org.joml.Quaternionf;
 import net.minecraft.util.math.Vec3d;
 
 public class ItemPreviewRender extends EntityRenderer<EntityItemPreview>{
-	public ItemPreviewRender(EntityRenderDispatcher dispatcher) {
-		super(dispatcher);
+	public ItemPreviewRender(EntityRendererFactory.Context ctx) {
+		super(ctx);
 	}
 
 	@Override
@@ -32,7 +32,7 @@ public class ItemPreviewRender extends EntityRenderer<EntityItemPreview>{
 		
 		matrices.translate(0, 0.5, 0);
 		Vec3d v = mcc.player.getPos();
-		Quaternion look = MVCUtils.lookAt(entity.getPos(), new Vec3d(v.x, entity.getY(), v.z));
+		Quaternionf look = MVCUtils.lookAt(entity.getPos(), new Vec3d(v.x, entity.getY(), v.z));
 		matrices.multiply(look);
 		matrices.push();
 		if(entity.getPreviewedItemStack().getItem() instanceof PlacableOrderableItem) {
@@ -40,7 +40,7 @@ public class ItemPreviewRender extends EntityRenderer<EntityItemPreview>{
 				matrices.translate(0, 0, -0.1);
 			}
 		}
-		MinecraftClient.getInstance().getItemRenderer().renderItem(entity.getPreviewedItemStack(), Mode.NONE, 200, 0, matrices, vertexConsumers);
+		MinecraftClient.getInstance().getItemRenderer().renderItem(entity.getPreviewedItemStack(), ModelTransformationMode.NONE, 200, 0, matrices, vertexConsumers, entity.getWorld(), entity.getId());
 		matrices.pop();
 		matrices.pop();
 	}

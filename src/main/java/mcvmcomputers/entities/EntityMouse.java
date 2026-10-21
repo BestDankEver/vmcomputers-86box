@@ -9,8 +9,9 @@ import net.minecraft.entity.data.TrackedData;
 import net.minecraft.entity.data.TrackedDataHandlerRegistry;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.Packet;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.listener.ClientPlayPacketListener;
 import net.minecraft.network.packet.s2c.play.EntitySpawnS2CPacket;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
@@ -31,12 +32,12 @@ public class EntityMouse extends Entity{
 	
 	public EntityMouse(World world, double x, double y, double z) {
 		this(EntityList.MOUSE, world);
-		this.updatePosition(x, y, z);
+		this.setPosition(x, y, z);
 	}
 	
 	public EntityMouse(World world, Double x, Double y, Double z, Vec3d lookAt, String uuid) {
 		this(EntityList.MOUSE, world);
-		this.updatePosition(x, y, z);
+		this.setPosition(x, y, z);
 		this.getDataTracker().set(LOOK_AT_POS_X, (float)lookAt.x);
 		this.getDataTracker().set(LOOK_AT_POS_Y, (float)lookAt.y);
 		this.getDataTracker().set(LOOK_AT_POS_Z, (float)lookAt.z);
@@ -53,13 +54,13 @@ public class EntityMouse extends Entity{
 		this.getDataTracker().startTracking(LOOK_AT_POS_Z, 0f);
 	}
 	@Override
-	protected void readCustomDataFromTag(CompoundTag tag) {
+	protected void readCustomDataFromNbt(NbtCompound tag) {
 		this.getDataTracker().set(LOOK_AT_POS_X, tag.getFloat("LookAtX"));
 		this.getDataTracker().set(LOOK_AT_POS_Y, tag.getFloat("LookAtY"));
 		this.getDataTracker().set(LOOK_AT_POS_Z, tag.getFloat("LookAtZ"));
 	}
 	@Override
-	protected void writeCustomDataToTag(CompoundTag tag) {
+	protected void writeCustomDataToNbt(NbtCompound tag) {
 		tag.putFloat("LookAtX", this.getDataTracker().get(LOOK_AT_POS_X));
 		tag.putFloat("LookAtY", this.getDataTracker().get(LOOK_AT_POS_Y));
 		tag.putFloat("LookAtZ", this.getDataTracker().get(LOOK_AT_POS_Z));
@@ -67,10 +68,10 @@ public class EntityMouse extends Entity{
 	
 	@Override
 	public ActionResult interact(PlayerEntity player, Hand hand) {
-		if(!player.world.isClient) {
+		if(!player.getWorld().isClient) {
 			if(player.isSneaking()) {
 				this.kill();
-				player.world.spawnEntity(new ItemEntity(player.world,
+				player.getWorld().spawnEntity(new ItemEntity(player.getWorld(),
 						this.getPos().x, this.getPos().y, this.getPos().z,
 						new ItemStack(ItemList.ITEM_MOUSE)));
 			}
@@ -79,12 +80,12 @@ public class EntityMouse extends Entity{
 	}
 	
 	@Override
-	public boolean collides() {
+	public boolean canHit() {
 		return true;
 	}
 
 	@Override
-	public Packet<?> createSpawnPacket() {
+	public Packet<ClientPlayPacketListener> createSpawnPacket() {
 		return new EntitySpawnS2CPacket(this);
 	}
 

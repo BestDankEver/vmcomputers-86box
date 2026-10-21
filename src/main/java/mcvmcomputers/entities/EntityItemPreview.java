@@ -8,8 +8,9 @@ import net.minecraft.entity.data.TrackedData;
 import net.minecraft.entity.data.TrackedDataHandlerRegistry;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.Packet;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.listener.ClientPlayPacketListener;
 import net.minecraft.network.packet.s2c.play.EntitySpawnS2CPacket;
 import net.minecraft.world.World;
 
@@ -23,18 +24,18 @@ public class EntityItemPreview extends Entity{
 	
 	public EntityItemPreview(World world, double x, double y, double z, ItemStack stack) {
 		this(EntityList.ITEM_PREVIEW, world);
-		this.updatePosition(x, y, z);
+		this.setPosition(x, y, z);
 		this.getDataTracker().set(PREVIEWED_STACK, stack);
 	}
 	
 	public EntityItemPreview(World world, double x, double y, double z) {
 		this(EntityList.ITEM_PREVIEW, world);
-		this.updatePosition(x, y, z);
+		this.setPosition(x, y, z);
 	}
 	
 	@Override
 	public void tick() {
-		if(this.world.isClient) {
+		if(this.getWorld().isClient) {
 			if(this != ClientMod.thePreviewEntity) {
 				this.kill();
 			}
@@ -57,19 +58,19 @@ public class EntityItemPreview extends Entity{
 	}
 
 	@Override
-	protected void readCustomDataFromTag(CompoundTag tag) {
+	protected void readCustomDataFromNbt(NbtCompound tag) {
 		if(tag.contains("Item")) {
-			this.getDataTracker().set(PREVIEWED_STACK, ItemStack.fromTag(tag.getCompound("Item")));
+			this.getDataTracker().set(PREVIEWED_STACK, ItemStack.fromNbt(tag.getCompound("Item")));
 		}
 	}
 
 	@Override
-	protected void writeCustomDataToTag(CompoundTag tag) {
-		tag.put("Item", this.getDataTracker().get(PREVIEWED_STACK).toTag(new CompoundTag()));
+	protected void writeCustomDataToNbt(NbtCompound tag) {
+		tag.put("Item", this.getDataTracker().get(PREVIEWED_STACK).writeNbt(new NbtCompound()));
 	}
 
 	@Override
-	public Packet<?> createSpawnPacket() {
+	public Packet<ClientPlayPacketListener> createSpawnPacket() {
 		return new EntitySpawnS2CPacket(this);
 	}
 

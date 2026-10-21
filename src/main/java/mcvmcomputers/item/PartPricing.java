@@ -2,7 +2,7 @@ package mcvmcomputers.item;
 
 import mcvmcomputers.emu.Catalog.CardCategory;
 import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtCompound;
 
 /**
  * Prices in iron ingots, worked out from the part's own NBT so the server can
@@ -20,7 +20,7 @@ public final class PartPricing {
 			return stack.getItem() instanceof OrderableItem ? ((OrderableItem) stack.getItem()).getPrice() : 0;
 		}
 		ItemPart item = (ItemPart) stack.getItem();
-		CompoundTag p = ItemPart.partTag(stack);
+		NbtCompound p = ItemPart.partTag(stack);
 		if (p == null) {
 			return 1;
 		}
@@ -54,7 +54,7 @@ public final class PartPricing {
 				return 5;
 			case ACCEL: {
 				// Voodoo 2 class cards cost more; a second board for SLI doubles the price.
-				CompoundTag o = p.getCompound("Options");
+				NbtCompound o = p.getCompound("Options");
 				String type = o.getString("type");
 				int base = type.endsWith("_2") || type.contains("sb50") ? 9 : 7;
 				return "1".equals(o.getString("sli")) ? base * 2 : base;

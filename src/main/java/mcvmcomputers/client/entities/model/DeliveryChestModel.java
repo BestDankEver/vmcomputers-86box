@@ -6,6 +6,12 @@ import java.util.Random;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.model.ModelPart;
+import net.minecraft.client.model.ModelData;
+import net.minecraft.client.model.ModelPartData;
+import net.minecraft.client.model.ModelPartBuilder;
+import net.minecraft.client.model.ModelTransform;
+import net.minecraft.client.model.Dilation;
+import net.minecraft.client.model.TexturedModelData;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.render.VertexConsumerProvider;
@@ -43,84 +49,34 @@ public class DeliveryChestModel extends EntityModel<Entity> {
 
 	public DeliveryChestModel() throws IOException {
 		this.mcc = MinecraftClient.getInstance();
-		this.baseTexture = NativeImage.read(mcc.getResourceManager().getResource(new Identifier("mcvmcomputers", "textures/entity/delivery_chest.png")).getInputStream());
-		
-		textureWidth = 64;
-		textureHeight = 64;
-
-		model = new ModelPart(this);
-		model.setPivot(0.0F, 7.0F, 0.0F);
-		model.setTextureOffset(0, 0).addCuboid(-6.0F, -5.0F, -6.0F, 12.0F, 8.0F, 12.0F, 0.0F, false);
-
-		opening = new ModelPart(this);
-		opening.setPivot(0.0F, -5.0F, 6.0F);
-		model.addChild(opening);
-		setRotationAngle(opening, -1.1345F, 0.0F, 0.0F);
-		opening.setTextureOffset(0, 20).addCuboid(-6.0F, -2.0F, -12.0F, 12.0F, 2.0F, 12.0F, 0.0F, false);
-
-		upleg0 = new ModelPart(this);
-		upleg0.setPivot(-6.0F, 3.0F, 6.0F);
-		model.addChild(upleg0);
-		setRotationAngle(upleg0, 0.0F, 0.7854F, 0.0F);
-		upleg0.setTextureOffset(24, 34).addCuboid(-1.0F, 0.0F, -0.5F, 2.0F, 7.0F, 1.0F, 0.0F, false);
-
-		uleg0 = new ModelPart(this);
-		uleg0.setPivot(-0.9828F, 7.0F, -0.0071F);
-		upleg0.addChild(uleg0);
-		uleg0.setTextureOffset(0, 46).addCuboid(-1.0F, 0.0F, -0.5F, 2.0F, 6.0F, 1.0F, 0.0F, false);
-		uleg0.setTextureOffset(0, 20).addCuboid(-1.4868F, 6.0F, -1.5232F, 3.0F, 1.0F, 3.0F, 0.0F, false);
-
-		upleg1 = new ModelPart(this);
-		upleg1.setPivot(-6.0F, 3.0F, -6.0F);
-		model.addChild(upleg1);
-		setRotationAngle(upleg1, 0.0F, -0.7854F, 0.0F);
-		upleg1.setTextureOffset(0, 34).addCuboid(-1.0F, 0.0F, -0.5F, 2.0F, 7.0F, 1.0F, 0.0F, false);
-
-		uleg1 = new ModelPart(this);
-		uleg1.setPivot(-0.9828F, 7.0F, -0.0071F);
-		upleg1.addChild(uleg1);
-		uleg1.setTextureOffset(44, 44).addCuboid(-1.0F, 0.0F, -0.5F, 2.0F, 6.0F, 1.0F, 0.0F, false);
-		uleg1.setTextureOffset(0, 8).addCuboid(-1.4868F, 6.0F, -1.5232F, 3.0F, 1.0F, 3.0F, 0.0F, false);
-
-		upleg2 = new ModelPart(this);
-		upleg2.setPivot(6.0F, 3.0F, -6.0F);
-		model.addChild(upleg2);
-		setRotationAngle(upleg2, 0.0F, -2.3562F, 0.0F);
-		upleg2.setTextureOffset(6, 24).addCuboid(-1.0F, 0.0F, -0.5F, 2.0F, 7.0F, 1.0F, 0.0F, false);
-
-		uleg2 = new ModelPart(this);
-		uleg2.setPivot(-0.9828F, 7.0F, -0.0071F);
-		upleg2.addChild(uleg2);
-		uleg2.setTextureOffset(38, 43).addCuboid(-1.0F, 0.0F, -0.5F, 2.0F, 6.0F, 1.0F, 0.0F, false);
-		uleg2.setTextureOffset(0, 4).addCuboid(-1.4868F, 6.0F, -1.5232F, 3.0F, 1.0F, 3.0F, 0.0F, false);
-
-		upleg3 = new ModelPart(this);
-		upleg3.setPivot(6.0F, 3.0F, 6.0F);
-		model.addChild(upleg3);
-		setRotationAngle(upleg3, 0.0F, 2.3562F, 0.0F);
-		upleg3.setTextureOffset(0, 24).addCuboid(-1.0F, 0.0F, -0.5F, 2.0F, 7.0F, 1.0F, 0.0F, false);
-
-		uleg3 = new ModelPart(this);
-		uleg3.setPivot(-0.9828F, 7.0F, -0.0071F);
-		upleg3.addChild(uleg3);
-		uleg3.setTextureOffset(32, 43).addCuboid(-1.0F, 0.0F, -0.5F, 2.0F, 6.0F, 1.0F, 0.0F, false);
-		uleg3.setTextureOffset(0, 0).addCuboid(-1.4868F, 6.0F, -1.5232F, 3.0F, 1.0F, 3.0F, 0.0F, false);
-
-		engine = new ModelPart(this);
-		engine.setPivot(0.0F, 0.0F, 0.0F);
-		model.addChild(engine);
-		engine.setTextureOffset(0, 34).addCuboid(-4.0F, 8.0F, -4.0F, 8.0F, 4.0F, 8.0F, 0.0F, false);
-		engine.setTextureOffset(36, 0).addCuboid(-3.0F, 5.0F, -3.0F, 6.0F, 3.0F, 6.0F, 0.0F, false);
-		engine.setTextureOffset(36, 20).addCuboid(-2.0F, 3.0F, -2.0F, 4.0F, 2.0F, 4.0F, 0.0F, false);
-		engine.setTextureOffset(36, 26).addCuboid(-4.0F, 3.0F, 3.0F, 1.0F, 5.0F, 1.0F, 0.0F, false);
-		engine.setTextureOffset(30, 34).addCuboid(3.0F, 3.0F, 3.0F, 1.0F, 5.0F, 1.0F, 0.0F, false);
-		engine.setTextureOffset(36, 0).addCuboid(-4.0F, 3.0F, -4.0F, 1.0F, 5.0F, 1.0F, 0.0F, false);
-		engine.setTextureOffset(34, 34).addCuboid(3.0F, 3.0F, -4.0F, 1.0F, 5.0F, 1.0F, 0.0F, false);
-
-		fire = new ModelPart(this);
-		fire.setPivot(0.0F, 13.0F, 0.0F);
-		engine.addChild(fire);
-		fire.setTextureOffset(32, 34).addCuboid(-3.0F, -1.0F, -3.0F, 6.0F, 3.0F, 6.0F, 0.0F, false);
+		this.baseTexture = NativeImage.read(mcc.getResourceManager().getResource(new Identifier("mcvmcomputers", "textures/entity/delivery_chest.png")).orElseThrow().getInputStream());
+		ModelData modelData = new ModelData();
+		ModelPartData modelRoot = modelData.getRoot();
+		ModelPartData modelPartData = modelRoot.addChild("model", ModelPartBuilder.create().mirrored(false).uv(0, 0).cuboid(-6.0F, -5.0F, -6.0F, 12.0F, 8.0F, 12.0F, new Dilation(0.0F)), ModelTransform.of(0.0F, 7.0F, 0.0F, 0.0F, 0.0F, 0.0F));
+		ModelPartData openingData = modelPartData.addChild("opening", ModelPartBuilder.create().mirrored(false).uv(0, 20).cuboid(-6.0F, -2.0F, -12.0F, 12.0F, 2.0F, 12.0F, new Dilation(0.0F)), ModelTransform.of(0.0F, -5.0F, 6.0F, -1.1345F, 0.0F, 0.0F));
+		ModelPartData upleg0Data = modelPartData.addChild("upleg0", ModelPartBuilder.create().mirrored(false).uv(24, 34).cuboid(-1.0F, 0.0F, -0.5F, 2.0F, 7.0F, 1.0F, new Dilation(0.0F)), ModelTransform.of(-6.0F, 3.0F, 6.0F, 0.0F, 0.7854F, 0.0F));
+		ModelPartData uleg0Data = upleg0Data.addChild("uleg0", ModelPartBuilder.create().mirrored(false).uv(0, 46).cuboid(-1.0F, 0.0F, -0.5F, 2.0F, 6.0F, 1.0F, new Dilation(0.0F)).mirrored(false).uv(0, 20).cuboid(-1.4868F, 6.0F, -1.5232F, 3.0F, 1.0F, 3.0F, new Dilation(0.0F)), ModelTransform.of(-0.9828F, 7.0F, -0.0071F, 0.0F, 0.0F, 0.0F));
+		ModelPartData upleg1Data = modelPartData.addChild("upleg1", ModelPartBuilder.create().mirrored(false).uv(0, 34).cuboid(-1.0F, 0.0F, -0.5F, 2.0F, 7.0F, 1.0F, new Dilation(0.0F)), ModelTransform.of(-6.0F, 3.0F, -6.0F, 0.0F, -0.7854F, 0.0F));
+		ModelPartData uleg1Data = upleg1Data.addChild("uleg1", ModelPartBuilder.create().mirrored(false).uv(44, 44).cuboid(-1.0F, 0.0F, -0.5F, 2.0F, 6.0F, 1.0F, new Dilation(0.0F)).mirrored(false).uv(0, 8).cuboid(-1.4868F, 6.0F, -1.5232F, 3.0F, 1.0F, 3.0F, new Dilation(0.0F)), ModelTransform.of(-0.9828F, 7.0F, -0.0071F, 0.0F, 0.0F, 0.0F));
+		ModelPartData upleg2Data = modelPartData.addChild("upleg2", ModelPartBuilder.create().mirrored(false).uv(6, 24).cuboid(-1.0F, 0.0F, -0.5F, 2.0F, 7.0F, 1.0F, new Dilation(0.0F)), ModelTransform.of(6.0F, 3.0F, -6.0F, 0.0F, -2.3562F, 0.0F));
+		ModelPartData uleg2Data = upleg2Data.addChild("uleg2", ModelPartBuilder.create().mirrored(false).uv(38, 43).cuboid(-1.0F, 0.0F, -0.5F, 2.0F, 6.0F, 1.0F, new Dilation(0.0F)).mirrored(false).uv(0, 4).cuboid(-1.4868F, 6.0F, -1.5232F, 3.0F, 1.0F, 3.0F, new Dilation(0.0F)), ModelTransform.of(-0.9828F, 7.0F, -0.0071F, 0.0F, 0.0F, 0.0F));
+		ModelPartData upleg3Data = modelPartData.addChild("upleg3", ModelPartBuilder.create().mirrored(false).uv(0, 24).cuboid(-1.0F, 0.0F, -0.5F, 2.0F, 7.0F, 1.0F, new Dilation(0.0F)), ModelTransform.of(6.0F, 3.0F, 6.0F, 0.0F, 2.3562F, 0.0F));
+		ModelPartData uleg3Data = upleg3Data.addChild("uleg3", ModelPartBuilder.create().mirrored(false).uv(32, 43).cuboid(-1.0F, 0.0F, -0.5F, 2.0F, 6.0F, 1.0F, new Dilation(0.0F)).mirrored(false).uv(0, 0).cuboid(-1.4868F, 6.0F, -1.5232F, 3.0F, 1.0F, 3.0F, new Dilation(0.0F)), ModelTransform.of(-0.9828F, 7.0F, -0.0071F, 0.0F, 0.0F, 0.0F));
+		ModelPartData engineData = modelPartData.addChild("engine", ModelPartBuilder.create().mirrored(false).uv(0, 34).cuboid(-4.0F, 8.0F, -4.0F, 8.0F, 4.0F, 8.0F, new Dilation(0.0F)).mirrored(false).uv(36, 0).cuboid(-3.0F, 5.0F, -3.0F, 6.0F, 3.0F, 6.0F, new Dilation(0.0F)).mirrored(false).uv(36, 20).cuboid(-2.0F, 3.0F, -2.0F, 4.0F, 2.0F, 4.0F, new Dilation(0.0F)).mirrored(false).uv(36, 26).cuboid(-4.0F, 3.0F, 3.0F, 1.0F, 5.0F, 1.0F, new Dilation(0.0F)).mirrored(false).uv(30, 34).cuboid(3.0F, 3.0F, 3.0F, 1.0F, 5.0F, 1.0F, new Dilation(0.0F)).mirrored(false).uv(36, 0).cuboid(-4.0F, 3.0F, -4.0F, 1.0F, 5.0F, 1.0F, new Dilation(0.0F)).mirrored(false).uv(34, 34).cuboid(3.0F, 3.0F, -4.0F, 1.0F, 5.0F, 1.0F, new Dilation(0.0F)), ModelTransform.of(0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F));
+		ModelPartData fireData = engineData.addChild("fire", ModelPartBuilder.create().mirrored(false).uv(32, 34).cuboid(-3.0F, -1.0F, -3.0F, 6.0F, 3.0F, 6.0F, new Dilation(0.0F)), ModelTransform.of(0.0F, 13.0F, 0.0F, 0.0F, 0.0F, 0.0F));
+		ModelPart modelBuilt = TexturedModelData.of(modelData, 64, 64).createModel();
+		model = modelBuilt.getChild("model");
+		opening = modelBuilt.getChild("model").getChild("opening");
+		upleg0 = modelBuilt.getChild("model").getChild("upleg0");
+		uleg0 = modelBuilt.getChild("model").getChild("upleg0").getChild("uleg0");
+		upleg1 = modelBuilt.getChild("model").getChild("upleg1");
+		uleg1 = modelBuilt.getChild("model").getChild("upleg1").getChild("uleg1");
+		upleg2 = modelBuilt.getChild("model").getChild("upleg2");
+		uleg2 = modelBuilt.getChild("model").getChild("upleg2").getChild("uleg2");
+		upleg3 = modelBuilt.getChild("model").getChild("upleg3");
+		uleg3 = modelBuilt.getChild("model").getChild("upleg3").getChild("uleg3");
+		engine = modelBuilt.getChild("model").getChild("engine");
+		fire = modelBuilt.getChild("model").getChild("engine").getChild("fire");
 	}
 	
 	private void generateTexture() {
@@ -132,12 +88,12 @@ public class DeliveryChestModel extends EntityModel<Entity> {
 		ni.copyFrom(baseTexture);
 		for(int x = 38;x<50;x++) {
 			for(int y = 34;y<40;y++) {
-				ni.setPixelColor(x, y, randomColor());
+				ni.setColor(x, y, randomColor());
 			}
 		}
 		for(int x = 32;x<56;x++) {
 			for(int y = 40;y<43;y++) {
-				ni.setPixelColor(x, y, randomColor());
+				ni.setColor(x, y, randomColor());
 			}
 		}
 		nibt = new NativeImageBackedTexture(ni);

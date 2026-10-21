@@ -1,5 +1,7 @@
 package mcvmcomputers.client.gui;
 
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.text.Text;
 import java.nio.DoubleBuffer;
 import java.util.ArrayList;
 
@@ -11,7 +13,6 @@ import mcvmcomputers.emu.VmSession;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.text.TranslatableText;
 import net.minecraft.util.Language;
 
 /**
@@ -33,7 +34,7 @@ public class GuiFocus extends Screen {
 	private int heldAtStart = -1;
 
 	public GuiFocus() {
-		super(new TranslatableText("Focus"));
+		super(Text.translatable("Focus"));
 	}
 
 	@Override
@@ -60,7 +61,7 @@ public class GuiFocus extends Screen {
 	}
 
 	@Override
-	public void render(MatrixStack ms, int wmouseX, int wmouseY, float delta) {
+	public void render(DrawContext ms, int wmouseX, int wmouseY, float delta) {
 		long window = minecraft.getWindow().getHandle();
 		VmSession vm = ClientMod.vm;
 
@@ -86,9 +87,9 @@ public class GuiFocus extends Screen {
 		lastX = x;
 		lastY = y;
 
-		this.textRenderer.draw(ms, lang.get("mcvmcomputers.focus.lose").replace("%s", keyString), 4, 4, -1);
+		ms.drawText(this.textRenderer, lang.get("mcvmcomputers.focus.lose").replace("%s", keyString), 4, 4, -1, false);
 		if (vm == null || vm.state() != VmSession.State.RUNNING) {
-			this.textRenderer.draw(ms, lang.get("mcvmcomputers.focus.not_running"), 4, 14, 0xffff5555);
+			ms.drawText(this.textRenderer, lang.get("mcvmcomputers.focus.not_running"), 4, 14, 0xffff5555, false);
 		}
 
 		boolean pressed = !keys.isEmpty();
@@ -99,7 +100,7 @@ public class GuiFocus extends Screen {
 			}
 		}
 		if (pressed) {
-			minecraft.openScreen(null);
+			minecraft.setScreen(null);
 		}
 		super.render(ms, wmouseX, wmouseY, delta);
 	}
@@ -119,7 +120,7 @@ public class GuiFocus extends Screen {
 	}
 
 	@Override
-	public boolean isPauseScreen() {
+	public boolean shouldPause() {
 		return false;
 	}
 }

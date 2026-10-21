@@ -163,7 +163,7 @@ public final class ScreenStream {
 			for (int x = 0; x < size[0]; x++) {
 				int c = argb[row + x];
 				// NativeImage wants ABGR.
-				img.setPixelColor(x, y, 0xff000000 | ((c & 0xff) << 16) | (c & 0xff00) | ((c >> 16) & 0xff));
+				img.setColor(x, y, 0xff000000 | ((c & 0xff) << 16) | (c & 0xff00) | ((c >> 16) & 0xff));
 			}
 		}
 		return img;

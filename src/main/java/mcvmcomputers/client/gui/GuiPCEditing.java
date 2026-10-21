@@ -1,5 +1,7 @@
 package mcvmcomputers.client.gui;
 
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.text.Text;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -29,12 +31,10 @@ import net.minecraft.client.render.DiffuseLighting;
 import net.minecraft.client.render.OverlayTexture;
 import net.minecraft.client.render.VertexConsumerProvider;
 import net.minecraft.client.render.model.BakedModel;
-import net.minecraft.client.render.model.json.ModelTransformation.Mode;
+import net.minecraft.client.render.model.json.ModelTransformationMode;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.item.ItemStack;
 import net.minecraft.network.PacketByteBuf;
-import net.minecraft.text.LiteralText;
-import net.minecraft.text.TranslatableText;
 import net.minecraft.util.Language;
 
 /**
@@ -67,7 +67,7 @@ public class GuiPCEditing extends Screen {
 	private static final ItemStack HARD_DRIVE = new ItemStack(ItemList.ITEM_HARDDRIVE);
 
 	public GuiPCEditing(EntityPC pc) {
-		super(new TranslatableText("mcvmcomputers.pc_editing.title"));
+		super(Text.translatable("mcvmcomputers.pc_editing.title"));
 		this.pc = pc;
 		this.minecraft = MinecraftClient.getInstance();
 	}
@@ -84,7 +84,7 @@ public class GuiPCEditing extends Screen {
 
 	private void removePart(int slot, int index) {
 		PacketByteBuf b = PacketByteBufs.create();
-		b.writeInt(pc.getEntityId());
+		b.writeInt(pc.getId());
 		b.writeInt(slot);
 		b.writeInt(index);
 		ClientPlayNetworking.send(PacketList.C2S_REMOVE_PART, b);
@@ -93,7 +93,7 @@ public class GuiPCEditing extends Screen {
 	/** Sends new settings for an installed part (the PC must be off). */
 	private void configurePart(int slot, int index, String name, java.util.Map<String, String> options) {
 		PacketByteBuf b = PacketByteBufs.create();
-		b.writeInt(pc.getEntityId());
+		b.writeInt(pc.getId());
 		b.writeInt(slot);
 		b.writeInt(index);
 		b.writeString(name == null ? "" : name);
@@ -110,7 +110,7 @@ public class GuiPCEditing extends Screen {
 		if (running()) {
 			return;
 		}
-		minecraft.openScreen(new GuiOptions(this, sections, current, v -> title, v -> lang.get("mcvmcomputers.card_options.save"), save));
+		minecraft.setScreen(new GuiOptions(this, sections, current, v -> title, v -> lang.get("mcvmcomputers.card_options.save"), save));
 	}
 
 	/** The settings button for a part, or null when it has none (or no catalog). */
@@ -154,7 +154,7 @@ public class GuiPCEditing extends Screen {
 			List<String[]> models = new ArrayList<>();
 			models.add(new String[] { "", lang.get("mcvmcomputers.hdd.model_default") });
 			models.addAll(cat.hddModels);
-			minecraft.openScreen(new GuiChoicePicker(this, lang.get("mcvmcomputers.hdd.model"), models, d.model, picked -> {
+			minecraft.setScreen(new GuiChoicePicker(this, lang.get("mcvmcomputers.hdd.model"), models, d.model, picked -> {
 				java.util.Map<String, String> v = new java.util.HashMap<>();
 				v.put("model", picked);
 				configurePart(PacketList.SLOT_HDD, idx, "", v);
@@ -180,7 +180,7 @@ public class GuiPCEditing extends Screen {
 			int bx = this.width - 6 - cw;
 			boolean fixed = keyboard && m != null && m.hasFlag(Catalog.MACHINE_KEYBOARD);
 			if (!fixed && cat != null) {
-				ButtonWidget cb = this.addButton(WideButton.of(bx, y, cw, 12, new LiteralText(change), b -> {
+				ButtonWidget cb = this.addDrawableChild(WideButton.of(bx, y, cw, 12, Text.literal(change), b -> {
 					List<String[]> choices = new ArrayList<>();
 					choices.add(new String[] { "", t("mcvmcomputers.pc_editing.input_auto") });
 					for (Catalog.Card c : all) {
@@ -188,7 +188,7 @@ public class GuiPCEditing extends Screen {
 							choices.add(new String[] { c.id, c.name });
 						}
 					}
-					minecraft.openScreen(new GuiChoicePicker(this, label, choices, chosen == null ? "" : chosen.id, id -> {
+					minecraft.setScreen(new GuiChoicePicker(this, label, choices, chosen == null ? "" : chosen.id, id -> {
 						Catalog.Card picked = Catalog.find(all, id);
 						configurePart(slot, 0, id, picked == null ? new java.util.HashMap<>() : picked.resolve(null));
 					}));
@@ -196,7 +196,7 @@ public class GuiPCEditing extends Screen {
 				cb.active = !running();
 			}
 			if (sw > 0) {
-				ButtonWidget sb = this.addButton(WideButton.of(bx - sw - 2, y, sw, 12, new LiteralText(setup),
+				ButtonWidget sb = this.addDrawableChild(WideButton.of(bx - sw - 2, y, sw, 12, Text.literal(setup),
 						b -> openSettings(dev.name, GuiOptions.single(dev.settings), chosen.options, v -> configurePart(slot, 0, chosen.id, v))));
 				sb.active = !running();
 			}
@@ -205,7 +205,7 @@ public class GuiPCEditing extends Screen {
 	}
 
 	private void pick(GuiPartPicker.Filter filter) {
-		minecraft.openScreen(new GuiPartPicker(this, pc, filter));
+		minecraft.setScreen(new GuiPartPicker(this, pc, filter));
 	}
 
 	// ---- Layout ----------------------------------------------------------------------
@@ -223,8 +223,7 @@ public class GuiPCEditing extends Screen {
 	}
 
 	private void rebuild() {
-		this.buttons.clear();
-		this.children.clear();
+		this.clearChildren();
 		labels.clear();
 		builtFor = signature();
 		if (openCase) {
@@ -244,7 +243,7 @@ public class GuiPCEditing extends Screen {
 
 	private ButtonWidget button(int x, int y, String text, ButtonWidget.PressAction action) {
 		int w = this.textRenderer.getWidth(text) + 8;
-		return this.addButton(WideButton.of(x, y, w, 12, new LiteralText(text), action));
+		return this.addDrawableChild(WideButton.of(x, y, w, 12, Text.literal(text), action));
 	}
 
 	private void buildClosed() {
@@ -277,7 +276,7 @@ public class GuiPCEditing extends Screen {
 			button(x, y, t("mcvmcomputers.pc_editing.turn_off"), b -> ClientMod.powerOffNow());
 			if (v != null && v.state() == VmSession.State.RUNNING) {
 				int bx = x + this.textRenderer.getWidth(t("mcvmcomputers.pc_editing.turn_off")) + 12;
-				ButtonWidget use = button(bx, y, t("mcvmcomputers.pc_editing.use"), b -> minecraft.openScreen(new GuiFocus()));
+				ButtonWidget use = button(bx, y, t("mcvmcomputers.pc_editing.use"), b -> minecraft.setScreen(new GuiFocus()));
 				bx += use.getWidth() + 4;
 				ButtonWidget cad = button(bx, y, "Ctrl+Alt+Del", b -> v.ctrlAltDel());
 				bx += cad.getWidth() + 4;
@@ -303,7 +302,7 @@ public class GuiPCEditing extends Screen {
 			label(x + 8, y + 2, media.isEmpty() ? 0x777777 : 0xaaaaaa, media.isEmpty() ? t("mcvmcomputers.pc_editing.empty") : media);
 			int bx = Math.max(x + 8 + this.textRenderer.getWidth(media.isEmpty() ? t("mcvmcomputers.pc_editing.empty") : media) + 6, x + 120);
 			ButtonWidget ins = button(bx, y, t("mcvmcomputers.pc_editing.insert"),
-					b -> minecraft.openScreen(new GuiMediaPicker(this, pc, PacketList.MEDIA_FLOPPY, d)));
+					b -> minecraft.setScreen(new GuiMediaPicker(this, pc, PacketList.MEDIA_FLOPPY, d)));
 			if (!media.isEmpty()) {
 				button(bx + ins.getWidth() + 4, y, t("mcvmcomputers.pc_editing.eject"), b -> GuiMediaPicker.setMedia(pc, PacketList.MEDIA_FLOPPY, d, ""));
 			}
@@ -318,7 +317,7 @@ public class GuiPCEditing extends Screen {
 			label(x + 8, y + 2, media.isEmpty() ? 0x777777 : 0xaaaaaa, media.isEmpty() ? t("mcvmcomputers.pc_editing.empty") : media);
 			int bx = Math.max(x + 8 + this.textRenderer.getWidth(media.isEmpty() ? t("mcvmcomputers.pc_editing.empty") : media) + 6, x + 120);
 			ButtonWidget ins = button(bx, y, t("mcvmcomputers.pc_editing.insert"),
-					b -> minecraft.openScreen(new GuiMediaPicker(this, pc, PacketList.MEDIA_CD, d)));
+					b -> minecraft.setScreen(new GuiMediaPicker(this, pc, PacketList.MEDIA_CD, d)));
 			if (!media.isEmpty()) {
 				button(bx + ins.getWidth() + 4, y, t("mcvmcomputers.pc_editing.eject"), b -> GuiMediaPicker.setMedia(pc, PacketList.MEDIA_CD, d, ""));
 			}
@@ -490,11 +489,11 @@ public class GuiPCEditing extends Screen {
 			String shown = this.textRenderer.trimToWidth(name, this.width - x - 26 - (setupW > 0 ? setupW + 2 : 0));
 			label(x + 6, y + 2, 0xffffff, shown);
 			if (settings != null) {
-				ButtonWidget sb = this.addButton(WideButton.of(this.width - 20 - setupW, y, setupW, 12,
-						new LiteralText(t("mcvmcomputers.pc_editing.settings")), b -> settings.run()));
+				ButtonWidget sb = this.addDrawableChild(WideButton.of(this.width - 20 - setupW, y, setupW, 12,
+						Text.literal(t("mcvmcomputers.pc_editing.settings")), b -> settings.run()));
 				sb.active = !running();
 			}
-			this.addButton(WideButton.of(this.width - 18, y, 12, 12, new LiteralText("x"), b -> remove.run()));
+			this.addDrawableChild(WideButton.of(this.width - 18, y, 12, 12, Text.literal("x"), b -> remove.run()));
 		}
 		return y + ROW;
 	}
@@ -524,15 +523,15 @@ public class GuiPCEditing extends Screen {
 
 	@Override
 	public void tick() {
-		if (pc.removed) {
-			this.onClose();
+		if (pc.isRemoved()) {
+			this.close();
 		}
 	}
 
 	// ---- Drawing ---------------------------------------------------------------------
 
 	@Override
-	public void render(MatrixStack ms, int mouseX, int mouseY, float delta) {
+	public void render(DrawContext ms, int mouseX, int mouseY, float delta) {
 		if (!signature().equals(builtFor)) {
 			rebuild();
 		}
@@ -546,108 +545,110 @@ public class GuiPCEditing extends Screen {
 		if (Float.isNaN(introScale)) {
 			introScale = 1f;
 		}
-		renderCase();
+		renderCase(ms);
 
 		RenderSystem.disableDepthTest();
-		RenderSystem.pushMatrix();
-		RenderSystem.translatef(0, 0, 200);
-		fill(ms, panelLeft() - 6, 18, this.width - 2, this.height - 4, 0x90000000);
+		ms.getMatrices().push();
+		ms.getMatrices().translate(0, 0, 200);
+		ms.fill(panelLeft() - 6, 18, this.width - 2, this.height - 4, 0x90000000);
 		for (Object[] l : labels) {
-			this.textRenderer.draw(ms, (String) l[3], (int) l[0], (int) l[1], (int) l[2]);
+			ms.drawText(this.textRenderer, (String) l[3], (int) ((int) l[0]), (int) ((int) l[1]), (int) l[2], false);
 		}
 		super.render(ms, mouseX, mouseY, delta);
-		this.textRenderer.draw(ms, lang.get("mcvmcomputers.pc_editing.close"), 4, 4, -1);
+		ms.drawText(this.textRenderer, lang.get("mcvmcomputers.pc_editing.close"), 4, 4, -1, false);
 		if (openCase) {
-			this.textRenderer.draw(ms, lang.get("mcvmcomputers.pc_editing.scroll_hint"), 4, 14, 0x777777);
+			ms.drawText(this.textRenderer, lang.get("mcvmcomputers.pc_editing.scroll_hint"), 4, 14, 0x777777, false);
 		}
-		RenderSystem.popMatrix();
+		ms.getMatrices().pop();
 		RenderSystem.enableDepthTest();
 	}
 
-	private void renderCase() {
+	private void renderCase(DrawContext ctx) {
+		MatrixStack m = ctx.getMatrices();
 		HardwareSpec s = pc.getHardware();
 		// The original built java.awt.Color from this and crashed when the value left 0..1 (issue #198).
 		float shade = Float.isNaN(introScale) ? 1f : Math.max(0f, Math.min(1f, introScale));
 		int dim = ((int) (shade * 0.5f * 255f)) << 24;
-		this.fillGradient(new MatrixStack(), 0, 0, this.width, this.height, dim, dim);
-		RenderSystem.pushMatrix();
-		RenderSystem.enableRescaleNormal();
-		RenderSystem.enableAlphaTest();
-		RenderSystem.defaultAlphaFunc();
+		ctx.fillGradient(0, 0, this.width, this.height, dim, dim);
+		m.push();
 		RenderSystem.enableBlend();
 		RenderSystem.blendFunc(GlStateManager.SrcFactor.SRC_ALPHA, GlStateManager.DstFactor.ONE_MINUS_SRC_ALPHA);
-		RenderSystem.color4f(1.0F, 1.0F, 1.0F, 1.0F);
-		RenderSystem.translatef(panelLeft() / 2f, (this.height / 2f) - 40, 100.0F);
-		RenderSystem.rotatef(90f * introScale, 0f, -1f, 0f);
-		RenderSystem.rotatef(6f * introScale, 0, 0.1f, 0.1f);
-		RenderSystem.scalef(1.0F, -1.0F, 1.0F);
-		RenderSystem.scalef(introScale, introScale, introScale);
+		RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+		m.translate(panelLeft() / 2f, (this.height / 2f) - 40, 100.0F);
+		rotate(m, 90f * introScale, 0f, -1f, 0f);
+		rotate(m, 6f * introScale, 0, 0.1f, 0.1f);
+		m.scale(1.0F, -1.0F, 1.0F);
+		m.scale(introScale, introScale, introScale);
 		float size = Math.min(230f, panelLeft() * 0.9f);
-		RenderSystem.scalef(size, size, size);
-		renderItem(CASE_NO_PANEL);
+		m.scale(size, size, size);
+		renderItem(m, CASE_NO_PANEL);
 		if (s.motherboard != null) {
-			RenderSystem.pushMatrix();
-			RenderSystem.rotatef(90f, 0f, 0f, -1f);
-			RenderSystem.rotatef(90f, 0f, -1f, 0f);
-			RenderSystem.translatef(0.04f, 0.2f, -0.16f);
-			RenderSystem.scalef(0.55f, 0.55f, 0.55f);
-			renderItem(MOBO);
-			RenderSystem.popMatrix();
+			m.push();
+			rotate(m, 90f, 0f, 0f, -1f);
+			rotate(m, 90f, 0f, -1f, 0f);
+			m.translate(0.04f, 0.2f, -0.16f);
+			m.scale(0.55f, 0.55f, 0.55f);
+			renderItem(m, MOBO);
+			m.pop();
 		}
 		if (s.cpu != null) {
-			RenderSystem.pushMatrix();
-			RenderSystem.rotatef(90f, 0f, 0f, -1f);
-			RenderSystem.scalef(0.55f, 0.55f, 0.55f);
-			RenderSystem.translatef(0.23f, 0.48f, 0.13f);
-			renderItem(CPU);
-			RenderSystem.popMatrix();
+			m.push();
+			rotate(m, 90f, 0f, 0f, -1f);
+			m.scale(0.55f, 0.55f, 0.55f);
+			m.translate(0.23f, 0.48f, 0.13f);
+			renderItem(m, CPU);
+			m.pop();
 		}
 		if (!s.cards.isEmpty()) {
-			RenderSystem.pushMatrix();
-			RenderSystem.rotatef(90f, 0f, -1f, 0f);
-			RenderSystem.scalef(0.55f, 0.55f, 0.55f);
-			RenderSystem.rotatef(-90f, 1f, 0f, 0f);
-			RenderSystem.translatef(0.33f, 0.5f, -0.565f);
-			renderItem(CARD);
-			RenderSystem.popMatrix();
+			m.push();
+			rotate(m, 90f, 0f, -1f, 0f);
+			m.scale(0.55f, 0.55f, 0.55f);
+			rotate(m, -90f, 1f, 0f, 0f);
+			m.translate(0.33f, 0.5f, -0.565f);
+			renderItem(m, CARD);
+			m.pop();
 		}
 		for (int i = 0; i < Math.min(2, s.ramKb.size()); i++) {
-			RenderSystem.pushMatrix();
-			RenderSystem.scalef(0.55f, 0.55f, 0.55f);
-			RenderSystem.rotatef(90f, 0f, 0f, -1f);
-			RenderSystem.translatef(0.07f, 0.5f, i == 0 ? -0.203f : -0.33f);
-			renderItem(RAM);
-			RenderSystem.popMatrix();
+			m.push();
+			m.scale(0.55f, 0.55f, 0.55f);
+			rotate(m, 90f, 0f, 0f, -1f);
+			m.translate(0.07f, 0.5f, i == 0 ? -0.203f : -0.33f);
+			renderItem(m, RAM);
+			m.pop();
 		}
 		if (!s.hardDisks.isEmpty()) {
-			RenderSystem.pushMatrix();
-			RenderSystem.scalef(0.55f, 0.55f, 0.55f);
-			RenderSystem.translatef(0.1f, -0.3f, -0.5f);
-			renderItem(HARD_DRIVE);
-			RenderSystem.popMatrix();
+			m.push();
+			m.scale(0.55f, 0.55f, 0.55f);
+			m.translate(0.1f, -0.3f, -0.5f);
+			renderItem(m, HARD_DRIVE);
+			m.pop();
 		}
-		RenderSystem.pushMatrix();
-		RenderSystem.translatef(0, -panelX, 0);
-		renderItem(pc.getGlassSidepanel() ? CASE_ONLY_GLASS_PANEL : CASE_ONLY_PANEL);
-		RenderSystem.popMatrix();
-		RenderSystem.disableAlphaTest();
-		RenderSystem.disableRescaleNormal();
-		RenderSystem.popMatrix();
+		m.push();
+		m.translate(0, -panelX, 0);
+		renderItem(m, pc.getGlassSidepanel() ? CASE_ONLY_GLASS_PANEL : CASE_ONLY_PANEL);
+		m.pop();
+		m.pop();
 	}
 
-	private void renderItem(ItemStack stack) {
-		BakedModel model = minecraft.getItemRenderer().getHeldItemModel(stack, null, null);
+	private void renderItem(MatrixStack m, ItemStack stack) {
+		BakedModel model = minecraft.getItemRenderer().getModel(stack, null, null, 0);
 		VertexConsumerProvider.Immediate immediate = minecraft.getBufferBuilders().getEntityVertexConsumers();
 		boolean flat = !model.isSideLit();
 		if (flat) {
 			DiffuseLighting.disableGuiDepthLighting();
 		}
-		minecraft.getItemRenderer().renderItem(stack, Mode.NONE, false, new MatrixStack(), immediate, 15728640, OverlayTexture.DEFAULT_UV, model);
+		minecraft.getItemRenderer().renderItem(stack, ModelTransformationMode.NONE, false, m, immediate, 15728640, OverlayTexture.DEFAULT_UV, model);
 		immediate.draw();
 		RenderSystem.enableDepthTest();
 		if (flat) {
 			DiffuseLighting.enableGuiDepthLighting();
 		}
+	}
+
+	/** Like 1.16's RenderSystem.rotatef: degrees about an axis (normalized here). */
+	private static void rotate(MatrixStack m, float degrees, float x, float y, float z) {
+		float len = (float) Math.sqrt(x * x + y * y + z * z);
+		m.multiply(new org.joml.Quaternionf().rotationAxis((float) Math.toRadians(degrees), x / len, y / len, z / len));
 	}
 
 	@Override
@@ -662,7 +663,7 @@ public class GuiPCEditing extends Screen {
 	}
 
 	@Override
-	public boolean isPauseScreen() {
+	public boolean shouldPause() {
 		return false;
 	}
 }

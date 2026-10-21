@@ -1,5 +1,7 @@
 package mcvmcomputers.client.gui;
 
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.text.Text;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -15,8 +17,6 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.text.LiteralText;
-import net.minecraft.text.TranslatableText;
 import net.minecraft.util.Language;
 
 /**
@@ -60,7 +60,7 @@ public class GuiOptions extends Screen {
 	 */
 	public GuiOptions(Screen parent, List<Section> sections, Map<String, String> initial, Function<Map<String, String>, String> titleOf,
 			Function<Map<String, String>, String> confirmLabel, Consumer<Map<String, String>> onConfirm) {
-		super(new LiteralText(""));
+		super(Text.literal(""));
 		this.parent = parent;
 		this.sections = sections;
 		this.titleOf = titleOf;
@@ -128,8 +128,7 @@ public class GuiOptions extends Screen {
 
 	@Override
 	protected void init() {
-		this.buttons.clear();
-		this.children.clear();
+		this.clearChildren();
 		labels.clear();
 
 		int labelX = Math.max(6, this.width / 2 - 180);
@@ -155,20 +154,20 @@ public class GuiOptions extends Screen {
 
 			if (CardOption.SPINNER.equals(o.kind)) {
 				int n = parse(v, o.min);
-				ButtonWidget minus = this.addButton(WideButton.of(buttonX, y, 20, 20, new LiteralText("-"),
+				ButtonWidget minus = this.addDrawableChild(WideButton.of(buttonX, y, 20, 20, Text.literal("-"),
 						b -> set(key, "" + Math.max(o.min, n - o.step * (hasShiftDown() ? 10 : 1)))));
 				minus.active = n > o.min;
 				labels.add(new Object[] { buttonX + 26, y + 6, 0xffffff, v });
-				ButtonWidget plus = this.addButton(WideButton.of(buttonX + buttonW - 20, y, 20, 20, new LiteralText("+"),
+				ButtonWidget plus = this.addDrawableChild(WideButton.of(buttonX + buttonW - 20, y, 20, 20, Text.literal("+"),
 						b -> set(key, "" + Math.min(o.max, n + o.step * (hasShiftDown() ? 10 : 1)))));
 				plus.active = n < o.max;
 			} else {
 				List<String[]> allowed = allowedValues(o, variant);
 				String shown = display(o, v);
-				ButtonWidget b = this.addButton(WideButton.of(buttonX, y, buttonW, 20,
-						new LiteralText(this.textRenderer.trimToWidth(shown + (allowed.size() > CYCLE_MAX ? "  ..." : ""), buttonW - 8)), btn -> {
+				ButtonWidget b = this.addDrawableChild(WideButton.of(buttonX, y, buttonW, 20,
+						Text.literal(this.textRenderer.trimToWidth(shown + (allowed.size() > CYCLE_MAX ? "  ..." : ""), buttonW - 8)), btn -> {
 							if (allowed.size() > CYCLE_MAX) {
-								MinecraftClient.getInstance().openScreen(new GuiChoicePicker(this, o.label, allowed, values.get(key), picked -> set(key, picked)));
+								MinecraftClient.getInstance().setScreen(new GuiChoicePicker(this, o.label, allowed, values.get(key), picked -> set(key, picked)));
 								return;
 							}
 							int at = indexOf(allowed, values.get(key));
@@ -180,12 +179,12 @@ public class GuiOptions extends Screen {
 			y += ROW;
 		}
 
-		this.addButton(WideButton.of(this.width / 2 - 154, this.height - 28, 150, 20, new LiteralText(confirmLabel.apply(values)), b -> {
-			MinecraftClient.getInstance().openScreen(parent);
+		this.addDrawableChild(WideButton.of(this.width / 2 - 154, this.height - 28, 150, 20, Text.literal(confirmLabel.apply(values)), b -> {
+			MinecraftClient.getInstance().setScreen(parent);
 			onConfirm.accept(values);
 		}));
-		this.addButton(WideButton.of(this.width / 2 + 4, this.height - 28, 150, 20, new TranslatableText("gui.cancel"),
-				b -> MinecraftClient.getInstance().openScreen(parent)));
+		this.addDrawableChild(WideButton.of(this.width / 2 + 4, this.height - 28, 150, 20, Text.translatable("gui.cancel"),
+				b -> MinecraftClient.getInstance().setScreen(parent)));
 	}
 
 	private void set(String key, String value) {
@@ -242,25 +241,25 @@ public class GuiOptions extends Screen {
 	}
 
 	@Override
-	public void onClose() {
-		MinecraftClient.getInstance().openScreen(parent);
+	public void close() {
+		MinecraftClient.getInstance().setScreen(parent);
 	}
 
 	@Override
-	public void render(MatrixStack ms, int mouseX, int mouseY, float delta) {
+	public void render(DrawContext ms, int mouseX, int mouseY, float delta) {
 		this.renderBackground(ms);
 		String title = titleOf.apply(values);
-		this.textRenderer.drawWithShadow(ms, title, (this.width - this.textRenderer.getWidth(title)) / 2f, 10, 0xffffff);
+		ms.drawTextWithShadow(this.textRenderer, title, (int) ((this.width - this.textRenderer.getWidth(title)) / 2f), 10, 0xffffff);
 		String hint = lang.get("mcvmcomputers.card_options.hint");
-		this.textRenderer.draw(ms, hint, (this.width - this.textRenderer.getWidth(hint)) / 2f, 24, 0x888888);
+		ms.drawText(this.textRenderer, hint, (int) ((this.width - this.textRenderer.getWidth(hint)) / 2f), 24, 0x888888, false);
 		for (Object[] l : labels) {
-			this.textRenderer.draw(ms, (String) l[3], (int) l[0], (int) l[1], (int) l[2]);
+			ms.drawText(this.textRenderer, (String) l[3], (int) ((int) l[0]), (int) ((int) l[1]), (int) l[2], false);
 		}
 		super.render(ms, mouseX, mouseY, delta);
 	}
 
 	@Override
-	public boolean isPauseScreen() {
+	public boolean shouldPause() {
 		return false;
 	}
 }

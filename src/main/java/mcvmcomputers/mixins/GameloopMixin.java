@@ -43,7 +43,7 @@ public class GameloopMixin {
 		vhdDirectory.mkdirs();
 		isoDirectory = new File(mcc.runDirectory, "vm_computers/isos");
 		isoDirectory.mkdirs();
-		mcc.openScreen(new GuiSetup());
+		mcc.setScreen(new GuiSetup());
 	}
 
 	@Inject(at = @At("HEAD"), method = "render")
@@ -90,7 +90,7 @@ public class GameloopMixin {
 			return;
 		}
 		boolean tabletOut = false;
-		for (ItemStack is : player.getItemsHand()) {
+		for (ItemStack is : player.getHandItems()) {
 			if (is.getItem() instanceof ItemOrderingTablet) {
 				tabletOut = true;
 				break;
@@ -111,7 +111,7 @@ public class GameloopMixin {
 			Vec3d hit = crosshairTarget.getPos();
 			if (thePreviewEntity != null) {
 				thePreviewEntity.setItem(main);
-				thePreviewEntity.updatePosition(hit.x, hit.y, hit.z);
+				thePreviewEntity.setPosition(hit.x, hit.y, hit.z);
 			} else {
 				thePreviewEntity = new EntityItemPreview(world, hit.x, hit.y, hit.z, main);
 				this.world.addEntity(Integer.MAX_VALUE - 20, thePreviewEntity);

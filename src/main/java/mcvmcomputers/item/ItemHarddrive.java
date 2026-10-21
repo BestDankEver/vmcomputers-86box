@@ -9,10 +9,8 @@ import mcvmcomputers.utils.HardwareNbt;
 import net.minecraft.client.item.TooltipContext;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.text.LiteralText;
+import net.minecraft.nbt.NbtCompound;
 import net.minecraft.text.Text;
-import net.minecraft.text.TranslatableText;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Hand;
 import net.minecraft.util.TypedActionResult;
@@ -24,10 +22,6 @@ public class ItemHarddrive extends OrderableItem {
 		super(settings, 6);
 	}
 
-	@Override
-	public boolean shouldSyncTagToClient() {
-		return true;
-	}
 
 	@Override
 	public TypedActionResult<ItemStack> use(World world, PlayerEntity user, Hand hand) {
@@ -41,9 +35,9 @@ public class ItemHarddrive extends OrderableItem {
 	public Text getName(ItemStack stack) {
 		String f = fileOf(stack);
 		if (!f.isEmpty()) {
-			return new TranslatableText("mcvmcomputers.hdd_item_name", f).formatted(Formatting.WHITE);
+			return Text.translatable("mcvmcomputers.hdd_item_name", f).formatted(Formatting.WHITE);
 		}
-		return new TranslatableText("mcvmcomputers.hdd_item_name", new TranslatableText("mcvmcomputers.hdd_right_click").getString())
+		return Text.translatable("mcvmcomputers.hdd_item_name", Text.translatable("mcvmcomputers.hdd_right_click").getString())
 				.formatted(Formatting.WHITE);
 	}
 
@@ -51,29 +45,29 @@ public class ItemHarddrive extends OrderableItem {
 	public void appendTooltip(ItemStack stack, World world, List<Text> tooltip, TooltipContext context) {
 		int mb = sizeOf(stack);
 		if (mb > 0) {
-			tooltip.add(new TranslatableText("mcvmcomputers.hdd_size", HardwareSpec.ramLabel(mb * 1024)).formatted(Formatting.GRAY));
+			tooltip.add(Text.translatable("mcvmcomputers.hdd_size", HardwareSpec.ramLabel(mb * 1024)).formatted(Formatting.GRAY));
 		}
 		if (fileOf(stack).isEmpty()) {
 			return;
 		}
 		DiskPart d = toDisk(stack);
 		if (d.hasGeometry()) {
-			tooltip.add(new LiteralText(d.cylinders + " cylinders, " + d.heads + " heads, " + d.sectors + " sectors").formatted(Formatting.DARK_GRAY));
+			tooltip.add(Text.literal(d.cylinders + " cylinders, " + d.heads + " heads, " + d.sectors + " sectors").formatted(Formatting.DARK_GRAY));
 		}
 		if (!d.model.isEmpty()) {
 			mcvmcomputers.emu.Catalog cat = MainMod.catalogForTooltips();
-			tooltip.add(new LiteralText(cat == null ? d.model : cat.hddModelName(d.model)).formatted(Formatting.GRAY));
+			tooltip.add(Text.literal(cat == null ? d.model : cat.hddModelName(d.model)).formatted(Formatting.GRAY));
 		}
 		if (!DiskPart.RAW.equals(d.format)) {
 			String f = DiskPart.VHD_FIXED.equals(d.format) ? "Fixed-size VHD"
 					: DiskPart.VHD_DYNAMIC.equals(d.format) ? "Dynamic-size VHD" : "Differencing VHD (based on " + d.parent + ")";
-			tooltip.add(new LiteralText(f).formatted(Formatting.DARK_GRAY));
+			tooltip.add(Text.literal(f).formatted(Formatting.DARK_GRAY));
 		}
 	}
 
 	/** Everything about the disk stored on the item. */
 	public static DiskPart toDisk(ItemStack stack) {
-		CompoundTag t = stack.getTag();
+		NbtCompound t = stack.getNbt();
 		if (t == null) {
 			return new DiskPart("", 0);
 		}
@@ -83,11 +77,11 @@ public class ItemHarddrive extends OrderableItem {
 
 	/** Stores a disk on the item (keeps its anvil name). */
 	public static void setDisk(ItemStack stack, DiskPart d) {
-		CompoundTag t = stack.getOrCreateTag();
+		NbtCompound t = stack.getOrCreateNbt();
 		for (String k : new String[] { "Cyl", "Heads", "Spt", "Model", "Format", "Parent" }) {
 			t.remove(k);
 		}
-		CompoundTag dt = HardwareNbt.diskToTag(d);
+		NbtCompound dt = HardwareNbt.diskToTag(d);
 		t.putString("vhdfile", d.file);
 		t.putInt("SizeMb", Math.max(1, d.sizeMb));
 		for (String k : new String[] { "Cyl", "Heads", "Spt", "Model", "Format", "Parent" }) {
@@ -104,18 +98,18 @@ public class ItemHarddrive extends OrderableItem {
 	}
 
 	public static String fileOf(ItemStack stack) {
-		CompoundTag t = stack.getTag();
+		NbtCompound t = stack.getNbt();
 		return (t != null && t.contains("vhdfile")) ? t.getString("vhdfile") : "";
 	}
 
 	public static int sizeOf(ItemStack stack) {
-		CompoundTag t = stack.getTag();
+		NbtCompound t = stack.getNbt();
 		return t == null ? 0 : t.getInt("SizeMb");
 	}
 
 	/** The anvil name as text JSON, or "" if the drive wasn't renamed. */
 	public static String customNameOf(ItemStack stack) {
-		CompoundTag t = stack.getTag();
+		NbtCompound t = stack.getNbt();
 		if (t != null && t.contains("display", 10)) {
 			return t.getCompound("display").getString("Name");
 		}
@@ -125,16 +119,16 @@ public class ItemHarddrive extends OrderableItem {
 	public static ItemStack createHardDrive(String fileName, int sizeMb, String customName) {
 		ItemStack is = createHardDrive(fileName, sizeMb);
 		if (customName != null && !customName.isEmpty()) {
-			CompoundTag display = new CompoundTag();
+			NbtCompound display = new NbtCompound();
 			display.putString("Name", customName);
-			is.getOrCreateTag().put("display", display);
+			is.getOrCreateNbt().put("display", display);
 		}
 		return is;
 	}
 
 	public static ItemStack createHardDrive(String fileName, int sizeMb) {
 		ItemStack is = new ItemStack(ItemList.ITEM_HARDDRIVE);
-		CompoundTag ct = is.getOrCreateTag();
+		NbtCompound ct = is.getOrCreateNbt();
 		ct.putString("vhdfile", fileName);
 		ct.putInt("SizeMb", sizeMb);
 		return is;

@@ -96,7 +96,7 @@ public class TabletOS {
 		shopOutroSound = new TabletSoundInstance(SoundList.SHOPOUTRO_SOUND);
 		shopMusicSound = PositionedSoundInstance.master(SoundEvents.MUSIC_DISC_FAR, 0.6f, 0.2f);
 		displayOrderMusicSound = PositionedSoundInstance.master(SoundEvents.MUSIC_DISC_STRAD, 0.6f, 0.2f);
-		font = Font.createFont(Font.PLAIN, mcc.getResourceManager().getResource(new Identifier("mcvmcomputers", "font/tabletfont.ttf")).getInputStream());
+		font = Font.createFont(Font.PLAIN, mcc.getResourceManager().getResource(new Identifier("mcvmcomputers", "font/tabletfont.ttf")).orElseThrow().getInputStream());
 		radarRadius = new ArrayList<Float>();
 	}
 	
@@ -637,7 +637,7 @@ public class TabletOS {
 						if(shopState == ShopState.MENU) {
 							shopExtraIndex = 0; 
 							if(shopIndex == 0) {
-								mcc.openScreen(new GuiPartsCatalog());
+								mcc.setScreen(new GuiPartsCatalog());
 							}else if(shopIndex == 1) {
 								shopState = ShopState.PERIPHERALS;
 								renderExtraShopState = ShopState.PERIPHERALS;
