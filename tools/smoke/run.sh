@@ -41,7 +41,7 @@ shot() { import -display :99 -window root "out/$1.png" 2>/dev/null || true; }
 gradle runClient $REPO > out/client-console-title.log 2>&1 &
 sleep 60; shot s1-title-setup
 xdotool key Tab; sleep 1; shot s2-setup-tab
-pkill -f "net.fabricmc.devlaunchinjector" ; pkill -f KnotClient; sleep 8
+pkill -f "fabric.dli.env=client"; sleep 8
 cp run/logs/latest.log out/client-title.log 2>/dev/null
 # 2) Straight into the server.
 gradle runClient $REPO --args="--quickPlayMultiplayer localhost:25565" > out/client-console.log 2>&1 &
