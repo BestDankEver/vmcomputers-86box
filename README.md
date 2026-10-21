@@ -44,7 +44,7 @@ and compatibility always matches what 86Box will actually run.
 
 ## Playing
 
-1. Install Fabric Loader and Fabric API for Minecraft 1.16.5, then put the mod jar in `mods`.
+1. Install Fabric Loader and Fabric API for Minecraft 1.20.1, then put the mod jar in `mods`.
 2. Start the game and finish the short setup (folder and "leave the VM" keys).
 3. Craft an **Ordering Tablet**. When the satellite passes over, open the store.
    **Parts catalog** opens a searchable shop with every motherboard, CPU and card.
