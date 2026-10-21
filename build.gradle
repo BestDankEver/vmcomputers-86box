@@ -33,17 +33,22 @@ processResources {
 	}
 }
 
-// Minecraft 1.16.5 runs on Java 8, so the mod is compiled for Java 8
-// (Gradle and Loom themselves need Java 17 or newer to run).
+// Minecraft 1.20.1 runs on Java 17.
 tasks.withType(JavaCompile).configureEach {
 	it.options.encoding = "UTF-8"
-	it.options.release = 8
+	it.options.release = 17
 }
 
 java {
 	withSourcesJar()
-	sourceCompatibility = JavaVersion.VERSION_1_8
-	targetCompatibility = JavaVersion.VERSION_1_8
+	sourceCompatibility = JavaVersion.VERSION_17
+	targetCompatibility = JavaVersion.VERSION_17
+}
+
+// Everything the mod compiles against, in one folder (see .github/workflows/dev-classpath.yml).
+tasks.register('exportDevClasspath', Copy) {
+	from(sourceSets.main.compileClasspath)
+	into(layout.buildDirectory.dir('devlibs'))
 }
 
 jar {

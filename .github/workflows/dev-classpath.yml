@@ -1,0 +1,42 @@
+# One-off helper for porting: packages the compile classpath (Minecraft mapped
+# with Yarn, Fabric API, libraries) and the decompiled Minecraft sources into a
+# DRAFT release, so the port can be compiled somewhere that can't reach
+# Mojang's or Fabric's servers. Drafts are only visible to the repository's
+# collaborators; delete the release when the port is done.
+name: Dev classpath
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10.2"
+      - name: Export the classpath and Minecraft sources
+        run: |
+          gradle exportDevClasspath genSourcesWithVineflower --stacktrace
+          mkdir -p out
+          (cd build/devlibs && zip -q -r ../../out/devlibs.zip .)
+          src=$(find .gradle ~/.gradle -name 'minecraft-*-sources.jar' 2>/dev/null | grep -i named | head -1)
+          [ -n "$src" ] || src=$(find .gradle ~/.gradle -name '*-sources.jar' -path '*minecraft*' | head -1)
+          echo "sources: $src"
+          cp "$src" out/minecraft-sources.jar
+          ls -la out
+      - name: Upload as a draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete dev-classpath --repo "$GITHUB_REPOSITORY" --yes 2>/dev/null || true
+          gh release create dev-classpath --repo "$GITHUB_REPOSITORY" --draft --target "$GITHUB_SHA" \
+            --title "Dev classpath (porting helper, delete me)" --notes "Draft: not public." out/devlibs.zip out/minecraft-sources.jar
