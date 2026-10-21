@@ -5,7 +5,7 @@ Build real, working retro PCs in Minecraft. This is a fork of
 with VirtualBox replaced by [86Box](https://86box.net), an emulator of IBM PCs
 and compatibles from 1981 to the early 2000s.
 
-- **Minecraft 1.16.5, Fabric**, same as the original mod.
+- **Minecraft 1.20.1, Fabric** (the original mod was for 1.16.5; that version is on the `master` branch).
 - **Real hardware.** Hundreds of real motherboards, CPUs, video, sound and network
   cards, disk controllers, floppy and CD-ROM drives, all taken from 86Box itself.
   Parts only go where they'd really fit: a Pentium won't go in a 486 board and a PCI
