@@ -297,7 +297,7 @@ public class GuiPartsCatalog extends Screen {
 		for (Tab tb : Tab.values()) {
 			String n = lang.get(tb.key);
 			int w = this.textRenderer.getWidth(n) + 10;
-			ButtonWidget b = this.addButton(new ButtonWidget(x, 4, w, 16, new LiteralText(n), btn -> {
+			ButtonWidget b = this.addButton(WideButton.of(x, 4, w, 16, new LiteralText(n), btn -> {
 				tab = tb;
 				scroll = 0;
 				buildEntries();
@@ -343,7 +343,7 @@ public class GuiPartsCatalog extends Screen {
 
 		if (target != null && tab != Tab.BOARDS && tab != Tab.DRIVES) {
 			String label = lang.get(onlyFitting ? "mcvmcomputers.catalog.only_fitting_on" : "mcvmcomputers.catalog.only_fitting_off");
-			this.addButton(new ButtonWidget(192, 24, this.textRenderer.getWidth(label) + 10, 16, new LiteralText(label), b -> {
+			this.addButton(WideButton.of(192, 24, this.textRenderer.getWidth(label) + 10, 16, new LiteralText(label), b -> {
 				onlyFitting = !onlyFitting;
 				scroll = 0;
 				buildEntries();
@@ -369,13 +369,13 @@ public class GuiPartsCatalog extends Screen {
 			}
 			labels.add(new Object[] { priceX, y + 3, 0xdddddd, lang.get("mcvmcomputers.catalog.price").replace("%s", "" + e.price()) });
 			if (e.configurable()) {
-				this.addButton(new ButtonWidget(this.width - 100, y, 46, 13, new LiteralText(lang.get("mcvmcomputers.catalog.configure")), b -> {
+				this.addButton(WideButton.of(this.width - 100, y, 46, 13, new LiteralText(lang.get("mcvmcomputers.catalog.configure")), b -> {
 					if (ClientMod.tabletOS != null) {
 						openSetup(e);
 					}
 				}));
 			}
-			this.addButton(new ButtonWidget(this.width - 52, y, 46, 13, new LiteralText(lang.get("mcvmcomputers.catalog.add")), b -> {
+			this.addButton(WideButton.of(this.width - 52, y, 46, 13, new LiteralText(lang.get("mcvmcomputers.catalog.add")), b -> {
 				if (ClientMod.tabletOS == null) {
 					return;
 				}
@@ -386,7 +386,7 @@ public class GuiPartsCatalog extends Screen {
 			y += ROW;
 		}
 
-		this.addButton(new ButtonWidget(this.width - 106, this.height - 26, 100, 20, new LiteralText(lang.get("mcvmcomputers.catalog.done")),
+		this.addButton(WideButton.of(this.width - 106, this.height - 26, 100, 20, new LiteralText(lang.get("mcvmcomputers.catalog.done")),
 				b -> this.onClose()));
 	}
 

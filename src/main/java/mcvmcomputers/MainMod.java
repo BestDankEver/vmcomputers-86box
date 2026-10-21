@@ -141,6 +141,27 @@ public class MainMod implements ModInitializer {
 			});
 		});
 
+		ServerPlayNetworking.registerGlobalReceiver(C2S_AUDIO, (server, player, handler, buf, sender) -> {
+			int stream = buf.readInt();
+			byte[] data = buf.readByteArray(MAX_AUDIO_PACKET);
+			server.execute(() -> {
+				EntityPC pc = computers.get(player.getUuid());
+				if (pc == null) {
+					return;
+				}
+				for (ServerPlayerEntity p : PlayerLookup.tracking(pc)) {
+					if (p != player) {
+						PacketByteBuf b = PacketByteBufs.create();
+						b.writeUuid(player.getUuid());
+						b.writeInt(pc.getEntityId());
+						b.writeInt(stream);
+						b.writeByteArray(data);
+						ServerPlayNetworking.send(p, S2C_AUDIO, b);
+					}
+				}
+			});
+		});
+
 		ServerPlayNetworking.registerGlobalReceiver(C2S_TURN_ON_PC, (server, player, handler, buf, sender) -> {
 			int id = buf.readInt();
 			server.execute(() -> {
@@ -376,6 +397,16 @@ public class MainMod implements ModInitializer {
 			}
 			s.hardDisks.set(index, s.hardDisks.get(index).withModel(options.getOrDefault("model", "")));
 			break;
+		case SLOT_KEYBOARD:
+		case SLOT_MOUSE: {
+			HardwareSpec.Part dev = name.isEmpty() ? null : new HardwareSpec.Part(name, name, options);
+			if (slot == SLOT_KEYBOARD) {
+				s.keyboard = dev;
+			} else {
+				s.mouse = dev;
+			}
+			break;
+		}
 		default:
 			return;
 		}

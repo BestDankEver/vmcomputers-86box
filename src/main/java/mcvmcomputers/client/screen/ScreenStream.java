@@ -110,7 +110,7 @@ public final class ScreenStream {
 	}
 
 	/** Only bother encoding when someone else could be watching. */
-	private static boolean othersCanWatch() {
+	static boolean othersCanWatch() {
 		MinecraftClient mc = MinecraftClient.getInstance();
 		if (mc.getServer() != null) {
 			return mc.getServer().getCurrentPlayerCount() > 1; // singleplayer, or LAN with guests

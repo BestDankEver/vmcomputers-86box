@@ -62,6 +62,12 @@ public final class HardwareNbt {
 			disks.add(dt);
 		}
 		t.put("HardDisks", disks);
+		if (s.keyboard != null) {
+			t.put("Keyboard", partToTag(s.keyboard));
+		}
+		if (s.mouse != null) {
+			t.put("Mouse", partToTag(s.mouse));
+		}
 		t.put("FloppyImages", strings(s.floppyImages));
 		t.put("CdImages", strings(s.cdImages));
 		return t;
@@ -98,6 +104,12 @@ public final class HardwareNbt {
 		for (int i = 0; i < disks.size(); i++) {
 			CompoundTag dt = disks.getCompound(i);
 			s.hardDisks.add(tagToDisk(dt, dt.getString("CustomName")));
+		}
+		if (t.contains("Keyboard", TAG_COMPOUND)) {
+			s.keyboard = tagToPart(t.getCompound("Keyboard"));
+		}
+		if (t.contains("Mouse", TAG_COMPOUND)) {
+			s.mouse = tagToPart(t.getCompound("Mouse"));
 		}
 		ListTag fi = t.getList("FloppyImages", TAG_STRING);
 		for (int i = 0; i < fi.size(); i++) {

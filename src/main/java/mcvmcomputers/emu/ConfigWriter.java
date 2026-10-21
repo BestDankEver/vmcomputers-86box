@@ -331,18 +331,37 @@ public final class ConfigWriter {
 			}
 		}
 
-		// Input: a mouse the automation socket can move.
+		// Input: the chosen keyboard and mouse if they work on this board. Otherwise
+		// 86Box's usual keyboard, and a mouse the automation socket can move.
+		Card kbd = cat == null || spec.keyboard == null ? null : Catalog.find(cat.keyboards, spec.keyboard.id);
+		if (kbd != null && m != null && !m.hasFlag(Catalog.MACHINE_KEYBOARD) && kbd.fits(m)) {
+			ini.set("Input devices", "keyboard_type", kbd.id);
+			deviceSettings(ini, kbd, spec.keyboard.options);
+		}
 		String mouse = "msserial";
 		if (m != null) {
-			if (m.hasFlag(0x40L)) { // MACHINE_MOUSE
+			if (m.hasFlag(Catalog.MACHINE_MOUSE)) {
 				mouse = "internal";
 			} else if (m.hasBus(Catalog.MACHINE_BUS_PS2_PORTS)) {
 				mouse = "ps2";
 			}
 		}
+		Card ms = cat == null || spec.mouse == null ? null : Catalog.find(cat.mice, spec.mouse.id);
+		if (ms != null && m != null && ms.fits(m)) {
+			mouse = ms.id;
+			deviceSettings(ini, ms, spec.mouse.options);
+		}
 		ini.set("Input devices", "mouse_type", mouse);
 
 		return ini.toString();
+	}
+
+	private static void deviceSettings(Ini ini, Card dev, Map<String, String> options) {
+		if (dev.section != null && !dev.settings.isEmpty()) {
+			for (Map.Entry<String, String> e : dev.resolve(options).entrySet()) {
+				ini.set(dev.section, e.getKey(), e.getValue());
+			}
+		}
 	}
 
 	private static String multi(double d) {

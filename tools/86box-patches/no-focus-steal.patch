@@ -1,0 +1,17 @@
+diff --git a/src/qt/qt_main.cpp b/src/qt/qt_main.cpp
+index 3c67b98..62a46dd 100644
+--- a/src/qt/qt_main.cpp
++++ b/src/qt/qt_main.cpp
+@@ -809,6 +809,12 @@ main(int argc, char *argv[])
+ #endif
+ 
+     main_window = new MainWindow();
++#ifdef USE_AUTOMATION
++    /* Started by a program that drives it over the automation socket (and
++       usually hides the window): don't take the keyboard focus from it. */
++    if (automation_path[0])
++        main_window->setAttribute(Qt::WA_ShowWithoutActivating);
++#endif
+     if (startMaximized) {
+         main_window->showMaximized();
+     } else {

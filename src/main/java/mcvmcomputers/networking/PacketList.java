@@ -22,6 +22,9 @@ public class PacketList {
 	// Server to client
 	public static final Identifier S2C_SCREEN = new Identifier("mcvmcomputers", "s2c_screen_v2");
 	public static final Identifier S2C_STOP_SCREEN = new Identifier("mcvmcomputers", "s2c_stop_screen");
+	/** VM sound for nearby players. C2S: stream, ADPCM packet. S2C: owner, PC entity id, stream, ADPCM packet. */
+	public static final Identifier C2S_AUDIO = new Identifier("mcvmcomputers", "c2s_audio");
+	public static final Identifier S2C_AUDIO = new Identifier("mcvmcomputers", "s2c_audio");
 	public static final Identifier S2C_SYNC_ORDER = new Identifier("mcvmcomputers", "s2c_sync_order");
 
 	/** Part slots for C2S_REMOVE_PART. */
@@ -32,6 +35,9 @@ public class PacketList {
 	public static final int SLOT_FLOPPY = 4;
 	public static final int SLOT_CDROM = 5;
 	public static final int SLOT_HDD = 6;
+	/** C2S_CONFIGURE_PART only: name = device id ("" = automatic), options = its settings. */
+	public static final int SLOT_KEYBOARD = 7;
+	public static final int SLOT_MOUSE = 8;
 
 	/** Media kinds for C2S_SET_MEDIA. */
 	public static final int MEDIA_FLOPPY = 0;
@@ -39,4 +45,5 @@ public class PacketList {
 
 	/** Largest custom payload a client may send in 1.16 is 32767 bytes; stay well under it. */
 	public static final int MAX_SCREEN_CHUNK = 30000;
+	public static final int MAX_AUDIO_PACKET = 16384;
 }

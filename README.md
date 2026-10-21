@@ -19,14 +19,14 @@ and compatibles from 1981 to the early 2000s.
 
 ```
  86Box master ──nightly GitHub Action──► release: 86Box-Windows-x64.zip
- (unmodified, built with                          catalog.json  (parts + compatibility)
-  -D AUTOMATION=ON)                               manifest.json (what's newest)
+ (built with -D AUTOMATION=ON                    catalog.json  (parts + compatibility)
+  + tools/86box-patches)                          manifest.json (what's newest)
                                                           │
  the mod ──reads releases/latest/download/manifest.json──┘
    • catalog.json     every game start, for the parts shop
    • 86Box + ROM set  the first time a PC is switched on, then kept up to date
    • runs 86Box hidden and talks to it over its automation socket
-     (screen, keyboard, mouse, media, reset, power)
+     (screen, sound, keyboard, mouse, media, reset, power)
 ```
 
 **Why a separate build of 86Box?** 86Box has a built-in automation socket that lets
@@ -69,8 +69,15 @@ and compatibility always matches what 86Box will actually run.
    **Ctrl + Backspace**.
 
 Put CD images (`.iso`, `.cue`, `.chd`...) in `vm_computers/isos` and floppy images
-(`.img`, `.ima`, `.86f`...) in `vm_computers/floppies`. Insert them from the PC screen,
-even while it's running. Hard disks live in `vm_computers/vhds`, and each PC's BIOS
+(`.img`, `.ima`, `.86f`...) in `vm_computers/floppies`. A folder in `vm_computers/isos`
+works as a CD too: 86Box turns its files into a disc on the fly, so there's no need
+to make an ISO. Insert them from the PC screen, even while it's running.
+
+The PC's sound comes from the PC case: it fades with distance and pans as you turn,
+and players nearby hear it too. Its volume follows the **Jukebox/Note Blocks** slider.
+
+In the open case, **Keyboard and mouse** picks the keyboard (XT, AT, PS/2...) and the
+mouse (serial, bus, InPort, PS/2) with their settings, such as the COM port or IRQ. Hard disks live in `vm_computers/vhds`, and each PC's BIOS
 settings live in `vm_computers/machines/<pc id>`.
 
 Settings are in `vm_computers/setup.json`:
@@ -130,8 +137,8 @@ pages. The old "32/64-bit motherboard", "1/N host CPU" and fixed RAM items are g
 
 **Known limits:**
 - **Mouse wheel.** 86Box's automation socket has no mouse wheel command yet (#302).
-- **Sound.** The owner hears the PC through 86Box. Other players hear nothing, because
-  the automation socket can't export audio yet.
+- **Sound for other players** is compressed (about 12 KB/s per sound source) and
+  arrives a little later than for the owner.
 - **Platforms.** Nightly builds are made for 64-bit Windows. Other systems can point
   `custom86BoxExe` at their own 86Box built with `-D AUTOMATION=ON`.
 - **One PC at a time.** Each player can run one PC at a time.
@@ -143,8 +150,9 @@ pages. The old "32/64-bit motherboard", "1/N host CPU" and fixed RAM items are g
   and then a newline, which adds up to 40–200 ms per request because of Nagle's
   algorithm. The mod works around this, but setting `TCP_NODELAY`, or sending the
   newline together with the reply, would fix it in 86Box itself.
-- **Missing commands.** A mouse-wheel command and an audio stream would close the
-  last gaps.
+- **Missing commands.** A mouse-wheel command is the last gap. The audio stream
+  (`audio on|off|read`) and starting without taking the focus are small patches in
+  `tools/86box-patches` that could go upstream.
 - **Official builds.** Turning `AUTOMATION` on in the official builds would let the
   mod use them directly.
 

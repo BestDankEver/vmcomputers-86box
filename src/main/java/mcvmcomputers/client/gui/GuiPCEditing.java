@@ -162,6 +162,48 @@ public class GuiPCEditing extends Screen {
 		};
 	}
 
+	/** "Keyboard: PS/2 Keyboard  [Change] [Setup]" (or the board's built-in one). */
+	private int inputRow(int x, int y, int slot, Part chosen, Catalog.Machine m, Catalog cat, int top, int bottom) {
+		boolean keyboard = slot == PacketList.SLOT_KEYBOARD;
+		List<Catalog.Card> all = cat == null ? new ArrayList<>() : (keyboard ? cat.keyboards : cat.mice);
+		boolean builtIn = m != null && m.hasFlag(keyboard ? Catalog.MACHINE_KEYBOARD : Catalog.MACHINE_MOUSE) && chosen == null;
+		Catalog.Card dev = chosen == null ? null : Catalog.find(all, chosen.id);
+		String what = builtIn ? t("mcvmcomputers.pc_editing.input_builtin")
+				: dev != null ? dev.name : chosen != null ? chosen.id : t("mcvmcomputers.pc_editing.input_auto");
+		String label = t(keyboard ? "mcvmcomputers.pc_editing.keyboard" : "mcvmcomputers.pc_editing.mouse") + ": " + what;
+		if (visible(y, top, bottom)) {
+			String change = t("mcvmcomputers.pc_editing.change");
+			String setup = t("mcvmcomputers.pc_editing.settings");
+			int cw = this.textRenderer.getWidth(change) + 8;
+			int sw = dev != null && !dev.settings.isEmpty() ? this.textRenderer.getWidth(setup) + 8 : 0;
+			label(x + 6, y + 2, 0xffffff, this.textRenderer.trimToWidth(label, this.width - x - 20 - cw - sw - 4));
+			int bx = this.width - 6 - cw;
+			boolean fixed = keyboard && m != null && m.hasFlag(Catalog.MACHINE_KEYBOARD);
+			if (!fixed && cat != null) {
+				ButtonWidget cb = this.addButton(WideButton.of(bx, y, cw, 12, new LiteralText(change), b -> {
+					List<String[]> choices = new ArrayList<>();
+					choices.add(new String[] { "", t("mcvmcomputers.pc_editing.input_auto") });
+					for (Catalog.Card c : all) {
+						if (m == null || c.fits(m)) {
+							choices.add(new String[] { c.id, c.name });
+						}
+					}
+					minecraft.openScreen(new GuiChoicePicker(this, label, choices, chosen == null ? "" : chosen.id, id -> {
+						Catalog.Card picked = Catalog.find(all, id);
+						configurePart(slot, 0, id, picked == null ? new java.util.HashMap<>() : picked.resolve(null));
+					}));
+				}));
+				cb.active = !running();
+			}
+			if (sw > 0) {
+				ButtonWidget sb = this.addButton(WideButton.of(bx - sw - 2, y, sw, 12, new LiteralText(setup),
+						b -> openSettings(dev.name, GuiOptions.single(dev.settings), chosen.options, v -> configurePart(slot, 0, chosen.id, v))));
+				sb.active = !running();
+			}
+		}
+		return y + ROW;
+	}
+
 	private void pick(GuiPartPicker.Filter filter) {
 		minecraft.openScreen(new GuiPartPicker(this, pc, filter));
 	}
@@ -202,7 +244,7 @@ public class GuiPCEditing extends Screen {
 
 	private ButtonWidget button(int x, int y, String text, ButtonWidget.PressAction action) {
 		int w = this.textRenderer.getWidth(text) + 8;
-		return this.addButton(new ButtonWidget(x, y, w, 12, new LiteralText(text), action));
+		return this.addButton(WideButton.of(x, y, w, 12, new LiteralText(text), action));
 	}
 
 	private void buildClosed() {
@@ -374,6 +416,11 @@ public class GuiPCEditing extends Screen {
 			if (s.cards.size() < HardwareSpec.MAX_CARDS) {
 				y = addRow(x, y, t("mcvmcomputers.pc_editing.add"), () -> pick(GuiPartPicker.Filter.CARD), top, bottom);
 			}
+
+			// Keyboard and mouse.
+			y = heading(x, y, t("mcvmcomputers.pc_editing.input"), top, bottom);
+			y = inputRow(x, y, PacketList.SLOT_KEYBOARD, s.keyboard, m, cat, top, bottom);
+			y = inputRow(x, y, PacketList.SLOT_MOUSE, s.mouse, m, cat, top, bottom);
 		}
 
 		// Drives (they sit in the case, not on the board).
@@ -443,11 +490,11 @@ public class GuiPCEditing extends Screen {
 			String shown = this.textRenderer.trimToWidth(name, this.width - x - 26 - (setupW > 0 ? setupW + 2 : 0));
 			label(x + 6, y + 2, 0xffffff, shown);
 			if (settings != null) {
-				ButtonWidget sb = this.addButton(new ButtonWidget(this.width - 20 - setupW, y, setupW, 12,
+				ButtonWidget sb = this.addButton(WideButton.of(this.width - 20 - setupW, y, setupW, 12,
 						new LiteralText(t("mcvmcomputers.pc_editing.settings")), b -> settings.run()));
 				sb.active = !running();
 			}
-			this.addButton(new ButtonWidget(this.width - 18, y, 12, 12, new LiteralText("x"), b -> remove.run()));
+			this.addButton(WideButton.of(this.width - 18, y, 12, 12, new LiteralText("x"), b -> remove.run()));
 		}
 		return y + ROW;
 	}

@@ -1,0 +1,163 @@
+diff --git a/src/automation.c b/src/automation.c
+index 9a10872..af038fe 100644
+--- a/src/automation.c
++++ b/src/automation.c
+@@ -179,6 +179,20 @@ static int      speed_percent = -1;
+ 
+ /* Most recent frame handed to the renderer for monitor 0. */
+ static mutex_t  *frame_mutex;
++
++/* Audio capture ("audio on"): each output stream (main mix, CD, MIDI, ...)
++   is kept as int16 stereo in a ring until the client reads it. */
++#define AUDIO_STREAMS 8
++#define AUDIO_RING    (192000 * 2) /* 2 s of stereo at 96 kHz */
++typedef struct audio_stream_t {
++    int16_t *ring;
++    int      head;
++    int      count;
++    int      rate;
++} audio_stream_t;
++static atomic_int     audio_capture;
++static mutex_t       *audio_mutex;
++static audio_stream_t audio_streams[AUDIO_STREAMS];
+ static uint32_t *frame_buf;
+ static int       frame_w;
+ static int       frame_h;
+@@ -896,6 +910,42 @@ handle_request(char *line)
+             respond_ok_time();
+         } else
+             respond_error("usage: record start <interval_ms> <dir> | record stop");
++    } else if (!strcmp(argv[0], "audio") && (argc == 2)) {
++        /* audio on | audio off | audio read */
++        if (!strcmp(argv[1], "on") || !strcmp(argv[1], "off")) {
++            thread_wait_mutex(audio_mutex);
++            for (int i = 0; i < AUDIO_STREAMS; i++)
++                audio_streams[i].head = audio_streams[i].count = 0;
++            atomic_store(&audio_capture, !strcmp(argv[1], "on"));
++            thread_release_mutex(audio_mutex);
++            respond_ok_time();
++        } else if (!strcmp(argv[1], "read")) {
++            /* Everything captured since the last read, per stream, as base64
++               little-endian int16 interleaved stereo. */
++            resp.len = 0;
++            sb_printf(&resp, "{\"ok\":true,\"capture\":%s,\"streams\":[", atomic_load(&audio_capture) ? "true" : "false");
++            int n = 0;
++            thread_wait_mutex(audio_mutex);
++            for (int i = 0; i < AUDIO_STREAMS; i++) {
++                audio_stream_t *a = &audio_streams[i];
++                if (a->count <= 0)
++                    continue;
++                uint8_t *pcm = (uint8_t *) malloc((size_t) a->count * 2);
++                for (int j = 0; j < a->count; j++) {
++                    int16_t v      = a->ring[(a->head + j) % AUDIO_RING];
++                    pcm[j * 2]     = (uint8_t) (v & 0xff);
++                    pcm[j * 2 + 1] = (uint8_t) ((v >> 8) & 0xff);
++                }
++                sb_printf(&resp, "%s{\"src\":%d,\"rate\":%d,\"pcm\":\"", n++ ? "," : "", i, a->rate);
++                sb_base64(&resp, pcm, (size_t) a->count * 2);
++                sb_printf(&resp, "\"}");
++                free(pcm);
++                a->head = a->count = 0;
++            }
++            thread_release_mutex(audio_mutex);
++            sb_printf(&resp, "]}");
++        } else
++            respond_error("usage: audio on | audio off | audio read");
+     } else if (!strcmp(argv[0], "info")) {
+         cmd_info();
+     } else if (!strcmp(argv[0], "text")) {
+@@ -1499,6 +1549,7 @@ automation_init(void)
+     resp.len    = 0;
+     req_done    = thread_create_event();
+     frame_mutex = thread_create_mutex();
++    audio_mutex = thread_create_mutex();
+     held        = automation_start_held;
+     enabled     = 1;
+ 
+@@ -1536,3 +1587,40 @@ automation_close(void)
+     if (use_tcp)
+         remove(automation_token_file);
+ }
++
++int
++automation_audio(const void *buf, int src, int values, int rate, int is_float)
++{
++    if (!atomic_load(&audio_capture) || (audio_mutex == NULL) || (src < 0) || (src >= AUDIO_STREAMS) || (values <= 0))
++        return 0;
++
++    thread_wait_mutex(audio_mutex);
++    audio_stream_t *a = &audio_streams[src];
++    if (a->ring == NULL)
++        a->ring = (int16_t *) malloc(AUDIO_RING * sizeof(int16_t));
++    if (a->rate != rate) {
++        a->head = a->count = 0;
++        a->rate            = rate;
++    }
++    values &= ~1; /* whole stereo frames */
++    if (values > AUDIO_RING)
++        values = AUDIO_RING;
++    /* Nobody reading: drop the oldest audio rather than the newest. */
++    int over = a->count + values - AUDIO_RING;
++    if (over > 0) {
++        a->head = (a->head + over) % AUDIO_RING;
++        a->count -= over;
++    }
++    for (int i = 0; i < values; i++) {
++        int v;
++        if (is_float) {
++            float f = ((const float *) buf)[i] * 32768.0f;
++            v       = (f > 32767.0f) ? 32767 : ((f < -32768.0f) ? -32768 : (int) f);
++        } else
++            v = ((const int16_t *) buf)[i];
++        a->ring[(a->head + a->count) % AUDIO_RING] = (int16_t) v;
++        a->count++;
++    }
++    thread_release_mutex(audio_mutex);
++    return 1;
++}
+diff --git a/src/include/86box/automation.h b/src/include/86box/automation.h
+index dda42d3..f4aa725 100644
+--- a/src/include/86box/automation.h
++++ b/src/include/86box/automation.h
+@@ -47,6 +47,10 @@ extern void automation_quantum(void);
+ extern void automation_frame(int x, int y, int w, int h, int monitor_index);
+ /* Called by the CPU core on every reset (hard = 1 for power-on/hard reset). */
+ extern void automation_reset(int hard);
++/* Called by the sound backend with each finished buffer of interleaved stereo
++   samples (float or int16) from output stream src. Returns 1 when a client has
++   taken over the audio, in which case the host output should stay silent. */
++extern int automation_audio(const void *buf, int src, int values, int rate, int is_float);
+ #else
+ #    define automation_init()
+ #    define automation_close()
+@@ -55,6 +59,7 @@ extern void automation_reset(int hard);
+ #    define automation_quantum()
+ #    define automation_frame(x, y, w, h, monitor_index)
+ #    define automation_reset(hard)
++#    define automation_audio(buf, src, values, rate, is_float) 0
+ #endif
+ 
+ #ifdef __cplusplus
+diff --git a/src/sound/openal.c b/src/sound/openal.c
+index 918b562..710ab13 100644
+--- a/src/sound/openal.c
++++ b/src/sound/openal.c
+@@ -31,6 +31,7 @@
+ #include <86box/86box.h>
+ #include <86box/midi.h>
+ #include <86box/sound.h>
++#include <86box/automation.h>
+ #include <86box/plat_unused.h>
+ #include <86box/thread.h>
+ 
+@@ -460,6 +461,10 @@ givealbuffer_common(const void *buf, const uint8_t src, const int size)
+     int    state;
+     ALuint buffer;
+ 
++    /* An automation client playing the audio itself: hand it over, stay quiet. */
++    if (automation_audio(buf, src, size, src_freqs[src] ? (int) src_freqs[src] : SOUND_FREQ, sound_is_float))
++        return;
++
+     if (!initialized || fast_forward)
+         return;
+ 

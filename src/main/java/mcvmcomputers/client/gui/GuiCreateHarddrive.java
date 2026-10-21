@@ -95,7 +95,7 @@ public class GuiCreateHarddrive extends Screen {
 
 	private ButtonWidget centered(int y, String text, ButtonWidget.PressAction a) {
 		int w = textRenderer.getWidth(text) + 40;
-		return this.addButton(new ButtonWidget(this.width / 2 - w / 2, y, w, 20, new LiteralText(text), a));
+		return this.addButton(WideButton.of(this.width / 2 - w / 2, y, w, 20, new LiteralText(text), a));
 	}
 
 	@Override
@@ -117,9 +117,9 @@ public class GuiCreateHarddrive extends Screen {
 					String name = f.getName();
 					int[] vhd = DiskImages.readVhd(f);
 					String label = name + "  |  " + (vhd != null ? vhd[3] + " MB, " + vhd[0] + "/" + vhd[1] + "/" + vhd[2] : (f.length() / 1024 / 1024) + " MB");
-					this.addButton(new ButtonWidget(this.width / 2 - 140, y, 260, 14, new LiteralText(this.textRenderer.trimToWidth(label, 254)),
+					this.addButton(WideButton.of(this.width / 2 - 140, y, 260, 14, new LiteralText(this.textRenderer.trimToWidth(label, 254)),
 							b -> select(existing(f))));
-					this.addButton(new ButtonWidget(this.width / 2 + 122, y, 14, 14, new LiteralText("x"), b -> {
+					this.addButton(WideButton.of(this.width / 2 + 122, y, 14, 14, new LiteralText("x"), b -> {
 						if (hasShiftDown()) {
 							f.delete();
 							init();
@@ -162,7 +162,7 @@ public class GuiCreateHarddrive extends Screen {
 		y += ROW;
 
 		label(lx, y + 6, "Image format");
-		this.addButton(new ButtonWidget(cx, y, cw, 20, new LiteralText(format.label), b -> {
+		this.addButton(WideButton.of(cx, y, cw, 20, new LiteralText(format.label), b -> {
 			format = Format.values()[Math.floorMod(format.ordinal() + (hasShiftDown() ? -1 : 1), Format.values().length)];
 			init();
 		}));
@@ -170,20 +170,20 @@ public class GuiCreateHarddrive extends Screen {
 
 		if (format == Format.VHD_DIFF) {
 			label(lx, y + 6, "Based on");
-			this.addButton(new ButtonWidget(cx, y, cw, 20, new LiteralText(parent.isEmpty() ? "Pick a VHD..." : parent), b -> pickParent()));
+			this.addButton(WideButton.of(cx, y, cw, 20, new LiteralText(parent.isEmpty() ? "Pick a VHD..." : parent), b -> pickParent()));
 			y += ROW;
 			label(lx, y + 4, "Stores only the changes; the base disk must stay unchanged.");
 			y += 14;
 		} else {
 			label(lx, y + 6, "Made for");
-			this.addButton(new ButtonWidget(cx, y, cw, 20, new LiteralText(iface.label), b -> {
+			this.addButton(WideButton.of(cx, y, cw, 20, new LiteralText(iface.label), b -> {
 				iface = Interface.values()[Math.floorMod(iface.ordinal() + (hasShiftDown() ? -1 : 1), Interface.values().length)];
 				init();
 			}));
 			y += ROW;
 
 			label(lx, y + 6, "Size");
-			this.addButton(new ButtonWidget(cx, y, cw, 20, new LiteralText(sizeMode.label), b -> {
+			this.addButton(WideButton.of(cx, y, cw, 20, new LiteralText(sizeMode.label), b -> {
 				sizeMode = SizeMode.values()[Math.floorMod(sizeMode.ordinal() + (hasShiftDown() ? -1 : 1), SizeMode.values().length)];
 				init();
 			}));
@@ -197,7 +197,7 @@ public class GuiCreateHarddrive extends Screen {
 				typeIndex = Math.max(0, Math.min(typeIndex, types.size() - 1));
 				String t = types.isEmpty() ? "(needs the parts catalog)" : typeLabel(typeIndex, types.get(typeIndex));
 				label(lx, y + 6, "Drive type");
-				this.addButton(new ButtonWidget(cx, y, cw, 20, new LiteralText(this.textRenderer.trimToWidth(t + "  ...", cw - 8)), b -> pickType(types)));
+				this.addButton(WideButton.of(cx, y, cw, 20, new LiteralText(this.textRenderer.trimToWidth(t + "  ...", cw - 8)), b -> pickType(types)));
 			} else {
 				label(lx, y + 5, "Cyl / heads / sectors");
 				cylField = field(cx, y, 60, cylText, 6);
@@ -209,7 +209,7 @@ public class GuiCreateHarddrive extends Screen {
 
 		label(lx, y + 6, "Drive model");
 		String modelLabel = model.isEmpty() ? lang.get("mcvmcomputers.hdd.model_default") : (cat == null ? model : cat.hddModelName(model));
-		this.addButton(new ButtonWidget(cx, y, cw, 20, new LiteralText(this.textRenderer.trimToWidth(modelLabel + "  ...", cw - 8)), b -> pickModel(cat)));
+		this.addButton(WideButton.of(cx, y, cw, 20, new LiteralText(this.textRenderer.trimToWidth(modelLabel + "  ...", cw - 8)), b -> pickModel(cat)));
 		y += ROW + 4;
 
 		statusY = y;
@@ -380,7 +380,7 @@ public class GuiCreateHarddrive extends Screen {
 
 	private void menuButton() {
 		int w = textRenderer.getWidth(translation("mcvmcomputers.vhd_setup.menu")) + 40;
-		this.addButton(new ButtonWidget(this.width - (w + 10), this.height - 30, w, 20, new LiteralText(translation("mcvmcomputers.vhd_setup.menu")),
+		this.addButton(WideButton.of(this.width - (w + 10), this.height - 30, w, 20, new LiteralText(translation("mcvmcomputers.vhd_setup.menu")),
 				b -> switchState(State.MENU)));
 	}
 

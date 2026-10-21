@@ -34,6 +34,8 @@
 #include <86box/network.h>
 #include <86box/scsi.h>
 #include <86box/hdd.h>
+#include <86box/keyboard.h>
+#include <86box/mouse.h>
 #include <86box/hdc.h>
 #include <86box/fdd.h>
 #include <86box/fdc.h>
@@ -389,6 +391,12 @@ device_options(const device_t *dev)
     fputs(n ? "\n      ]" : "]", out);
 }
 
+/* Keyboards and mice ([Input devices] keyboard_type / mouse_type). */
+static const device_t *k_dev(int c) { return keyboard_get_device(c); }
+static const char     *k_name(int c) { return keyboard_get_internal_name(c); }
+static const device_t *m_dev(int c) { return mouse_get_device(c); }
+static const char     *m_name(int c) { return mouse_get_internal_name(c); }
+
 static void
 accel_list(int *first)
 {
@@ -648,6 +656,14 @@ main(int argc, char **argv)
     device_list("hdc", h_dev, h_name, h_avail, &first);
     device_list("fdc", f_dev, f_name, f_avail, &first);
     accel_list(&first);
+    fputs("\n  },\n", out);
+
+    /* Keyboards and mice, with the machines they work on. "internal" (a board's
+       own keyboard or mouse) isn't listed: the mod handles it from the machine flags. */
+    fputs("  \"input\": {", out);
+    first = 1;
+    device_list("keyboard", k_dev, k_name, NULL, &first);
+    device_list("mouse", m_dev, m_name, NULL, &first);
     fputs("\n  }\n}\n", out);
 
     fclose(out);

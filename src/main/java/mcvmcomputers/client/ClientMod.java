@@ -371,9 +371,11 @@ public class ClientMod implements ClientModInitializer {
 		vmStatus = "";
 		lastLocalSerial = -1;
 		ScreenStream.ownerStopped();
+		mcvmcomputers.client.screen.AudioShare.reset();
 		MinecraftClient mc = MinecraftClient.getInstance();
 		if (mc.player != null) {
 			removeScreen(mc.player.getUuid());
+			VmAudio.stop(mc.player.getUuid());
 			if (mc.getNetworkHandler() != null) {
 				ClientPlayNetworking.send(PacketList.C2S_TURN_OFF_PC, PacketByteBufs.create());
 			}
@@ -422,8 +424,15 @@ public class ClientMod implements ClientModInitializer {
 					ScreenStream.decodeLocal(mc.player.getUuid(), f.png);
 				}
 				ScreenStream.ownerTick(v, settings == null ? 5 : settings.streamFps);
+				// The VM's sound, from the PC (and to players nearby).
+				VmSession.AudioChunk a;
+				while ((a = v.pollAudio()) != null) {
+					VmAudio.play(mc.player.getUuid(), vmEntityId, a.stream, a.rate, a.mono, a.silent);
+					mcvmcomputers.client.screen.AudioShare.owner(a);
+				}
 			}
 		}
+		VmAudio.tick();
 		// Upload whatever frames finished decoding (ours and other players').
 		for (UUID owner : ScreenStream.readyOwners()) {
 			NativeImage img = ScreenStream.takeReady(owner);
@@ -437,6 +446,7 @@ public class ClientMod implements ClientModInitializer {
 
 	public static void removeScreen(UUID owner) {
 		ScreenStream.forget(owner);
+		VmAudio.stop(owner);
 		ScreenTexture t = screens.remove(owner);
 		if (t != null) {
 			t.destroy();
@@ -445,6 +455,7 @@ public class ClientMod implements ClientModInitializer {
 	}
 
 	public static void removeAllScreens() {
+		VmAudio.stopAll();
 		for (UUID u : new ArrayList<>(screens.keySet())) {
 			removeScreen(u);
 		}
@@ -461,6 +472,22 @@ public class ClientMod implements ClientModInitializer {
 				return; // we draw our own screen locally
 			}
 			ScreenStream.onChunk(owner, chunk);
+		});
+
+		ClientPlayNetworking.registerGlobalReceiver(PacketList.S2C_AUDIO, (client, handler, buf, sender) -> {
+			UUID owner = buf.readUuid();
+			int entityId = buf.readInt();
+			int stream = buf.readInt();
+			byte[] data = buf.readByteArray(PacketList.MAX_AUDIO_PACKET);
+			if (client.player != null && owner.equals(client.player.getUuid())) {
+				return; // we play our own PC's sound at full quality
+			}
+			try {
+				mcvmcomputers.stream.AudioCodec.Decoded d = mcvmcomputers.stream.AudioCodec.decode(data);
+				VmAudio.receive(owner, entityId, stream, d.rate, d.mono);
+			} catch (RuntimeException e) {
+				// Damaged packet: skip it.
+			}
 		});
 
 		ClientPlayNetworking.registerGlobalReceiver(PacketList.S2C_STOP_SCREEN, (client, handler, buf, sender) -> {

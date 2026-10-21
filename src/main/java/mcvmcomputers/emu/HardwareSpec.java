@@ -159,6 +159,9 @@ public final class HardwareSpec {
 	/** CD-ROM drive models (86Box ids). */
 	public final List<Part> cdroms = new ArrayList<>();
 	public final List<DiskPart> hardDisks = new ArrayList<>();
+	/** Keyboard and mouse types (86Box ids, with their settings); null = let 86Box/the mod choose. */
+	public Part keyboard;
+	public Part mouse;
 
 	/** Inserted media, by drive position. Empty string = nothing inserted. */
 	public final List<String> floppyImages = new ArrayList<>();
@@ -302,6 +305,20 @@ public final class HardwareSpec {
 			for (DiskPart p : hardDisks) {
 				if (!d.parent.isEmpty() && d.parent.equals(p.file)) {
 					out.add(new Problem(true, d.file + " is based on " + p.file + "; they can't be in the same PC (the base disk must stay unchanged)."));
+				}
+			}
+		}
+		if (cat != null && m != null) {
+			if (keyboard != null && !m.hasFlag(Catalog.MACHINE_KEYBOARD)) {
+				Card k = Catalog.find(cat.keyboards, keyboard.id);
+				if (k == null || !k.fits(m)) {
+					out.add(new Problem(false, "The chosen keyboard doesn't work with this board; using the usual one."));
+				}
+			}
+			if (mouse != null) {
+				Card k = Catalog.find(cat.mice, mouse.id);
+				if (k == null || !k.fits(m)) {
+					out.add(new Problem(false, "The chosen mouse doesn't work with this board; using the usual one."));
 				}
 			}
 		}

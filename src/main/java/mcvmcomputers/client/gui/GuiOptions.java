@@ -155,17 +155,17 @@ public class GuiOptions extends Screen {
 
 			if (CardOption.SPINNER.equals(o.kind)) {
 				int n = parse(v, o.min);
-				ButtonWidget minus = this.addButton(new ButtonWidget(buttonX, y, 20, 20, new LiteralText("-"),
+				ButtonWidget minus = this.addButton(WideButton.of(buttonX, y, 20, 20, new LiteralText("-"),
 						b -> set(key, "" + Math.max(o.min, n - o.step * (hasShiftDown() ? 10 : 1)))));
 				minus.active = n > o.min;
 				labels.add(new Object[] { buttonX + 26, y + 6, 0xffffff, v });
-				ButtonWidget plus = this.addButton(new ButtonWidget(buttonX + buttonW - 20, y, 20, 20, new LiteralText("+"),
+				ButtonWidget plus = this.addButton(WideButton.of(buttonX + buttonW - 20, y, 20, 20, new LiteralText("+"),
 						b -> set(key, "" + Math.min(o.max, n + o.step * (hasShiftDown() ? 10 : 1)))));
 				plus.active = n < o.max;
 			} else {
 				List<String[]> allowed = allowedValues(o, variant);
 				String shown = display(o, v);
-				ButtonWidget b = this.addButton(new ButtonWidget(buttonX, y, buttonW, 20,
+				ButtonWidget b = this.addButton(WideButton.of(buttonX, y, buttonW, 20,
 						new LiteralText(this.textRenderer.trimToWidth(shown + (allowed.size() > CYCLE_MAX ? "  ..." : ""), buttonW - 8)), btn -> {
 							if (allowed.size() > CYCLE_MAX) {
 								MinecraftClient.getInstance().openScreen(new GuiChoicePicker(this, o.label, allowed, values.get(key), picked -> set(key, picked)));
@@ -180,11 +180,11 @@ public class GuiOptions extends Screen {
 			y += ROW;
 		}
 
-		this.addButton(new ButtonWidget(this.width / 2 - 154, this.height - 28, 150, 20, new LiteralText(confirmLabel.apply(values)), b -> {
+		this.addButton(WideButton.of(this.width / 2 - 154, this.height - 28, 150, 20, new LiteralText(confirmLabel.apply(values)), b -> {
 			MinecraftClient.getInstance().openScreen(parent);
 			onConfirm.accept(values);
 		}));
-		this.addButton(new ButtonWidget(this.width / 2 + 4, this.height - 28, 150, 20, new TranslatableText("gui.cancel"),
+		this.addButton(WideButton.of(this.width / 2 + 4, this.height - 28, 150, 20, new TranslatableText("gui.cancel"),
 				b -> MinecraftClient.getInstance().openScreen(parent)));
 	}
 

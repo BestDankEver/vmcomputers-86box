@@ -559,6 +559,8 @@ public final class Catalog {
 	public static final long MACHINE_VIDEO = 0x2L;
 	public static final long MACHINE_VIDEO_ONLY = 0x8L;
 	public static final long MACHINE_FDC = 0x80L;
+	public static final long MACHINE_KEYBOARD = 0x10L;
+	public static final long MACHINE_MOUSE = 0x40L;
 	public static final long MACHINE_SOUND = 0x20000L;
 	public static final long MACHINE_NIC_PRI = 0x40000L;
 	public static final long MACHINE_MFM = 0x800000L;
@@ -579,6 +581,9 @@ public final class Catalog {
 	public final Map<CardCategory, List<Card>> cards;
 	public final List<DriveType> floppyDrives;
 	public final List<DriveType> cdromDrives;
+	/** Keyboards and mice ([Input devices]); category is null. */
+	public final List<Card> keyboards;
+	public final List<Card> mice;
 	/** Hard disk models for hdd_NN_speed: {internal name, display name}. */
 	public final List<String[]> hddModels;
 	/** Standard drive types: {cylinders, heads, sectors}. */
@@ -714,6 +719,10 @@ public final class Catalog {
 		}
 		cdromDrives = Collections.unmodifiableList(cds);
 
+		Map<String, Object> input = Json.obj(root, "input");
+		keyboards = input == null ? Collections.<Card>emptyList() : inputDevices(Json.arr(input, "keyboard"), ms.size());
+		mice = input == null ? Collections.<Card>emptyList() : inputDevices(Json.arr(input, "mouse"), ms.size());
+
 		List<String[]> models = new ArrayList<>();
 		for (Object o : Json.arr(root, "hdd_models")) {
 			@SuppressWarnings("unchecked")
@@ -728,6 +737,26 @@ public final class Catalog {
 			diskTypes.add(new int[] { ((Number) t.get(0)).intValue(), ((Number) t.get(1)).intValue(), ((Number) t.get(2)).intValue() });
 		}
 		hddTypes = Collections.unmodifiableList(diskTypes);
+	}
+
+	private static List<Card> inputDevices(List<Object> arr, int machineCount) {
+		List<Card> out = new ArrayList<>();
+		for (Object o : arr) {
+			Map<String, Object> m = asObj(o);
+			out.add(new Card(null, Json.str(m, "id", ""), Json.str(m, "name", ""), Json.lng(m, "flags", 0),
+					hexBits(Json.str(m, "machines", ""), machineCount), null, Json.str(m, "section", null),
+					Collections.<String>emptySet(), new OptionSet(parseOptions(Json.arr(m, "options")))));
+		}
+		return Collections.unmodifiableList(out);
+	}
+
+	public static Card find(List<Card> list, String id) {
+		for (Card c : list) {
+			if (c.id.equals(id)) {
+				return c;
+			}
+		}
+		return null;
 	}
 
 	public String hddModelName(String id) {

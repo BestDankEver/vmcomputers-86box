@@ -55,6 +55,27 @@ public final class VmSession {
 	private Thread worker;
 	private volatile boolean stopRequested;
 
+	/** A piece of the VM's sound: one 86Box output stream (main mix, CD, MIDI...), mono. */
+	public static final class AudioChunk {
+		public final int stream;
+		public final int rate;
+		public final short[] mono;
+		/** True if every sample is zero. */
+		public final boolean silent;
+
+		AudioChunk(int stream, int rate, short[] mono, boolean silent) {
+			this.stream = stream;
+			this.rate = rate;
+			this.mono = mono;
+			this.silent = silent;
+		}
+	}
+
+	private static final int AUDIO_INTERVAL_MS = 25;
+	private static final int AUDIO_QUEUE_MAX = 200;
+	private final ConcurrentLinkedQueue<AudioChunk> audio = new ConcurrentLinkedQueue<>();
+	private volatile boolean audioCaptured;
+
 	private final AtomicReference<Frame> frame = new AtomicReference<>();
 	private long frameSerial;
 
@@ -88,6 +109,16 @@ public final class VmSession {
 	public boolean isActive() {
 		State s = state;
 		return s == State.STARTING || s == State.RUNNING || s == State.STOPPING;
+	}
+
+	/** Whether the sound comes to the mod (this 86Box supports it) rather than out of 86Box itself. */
+	public boolean audioCaptured() {
+		return audioCaptured;
+	}
+
+	/** The next piece of sound, or null. Only filled while {@link #audioCaptured()}. */
+	public AudioChunk pollAudio() {
+		return audio.poll();
 	}
 
 	public Frame latestFrame() {
@@ -260,8 +291,12 @@ public final class VmSession {
 				throw new IOException("Unknown 86Box automation protocol " + Json.integer(status, "protocol", 0));
 			}
 			state = State.RUNNING;
+			// Take over the sound so the game can play it from the PC. Older 86Box
+			// builds don't know the command and keep playing it themselves.
+			audioCaptured = Json.bool(client.command("audio on"), "ok", false);
 
 			long nextFrame = 0;
+			long nextAudio = 0;
 			long hideUntil = System.currentTimeMillis() + 10_000;
 			while (!stopRequested && process.isAlive()) {
 				long now = System.currentTimeMillis();
@@ -280,7 +315,12 @@ public final class VmSession {
 					grabFrame();
 					nextFrame = now + frameIntervalMs;
 				}
-				sleep(keys.isEmpty() ? Math.min(8, Math.max(1, nextFrame - System.currentTimeMillis())) : 0);
+				if (audioCaptured && now >= nextAudio) {
+					grabAudio();
+					nextAudio = now + AUDIO_INTERVAL_MS;
+				}
+				long next = audioCaptured ? Math.min(nextFrame, nextAudio) : nextFrame;
+				sleep(keys.isEmpty() ? Math.min(8, Math.max(1, next - System.currentTimeMillis())) : 0);
 			}
 			if (!stopRequested) {
 				throw new IOException("86Box stopped unexpectedly" + logHint());
@@ -297,6 +337,8 @@ public final class VmSession {
 				state = State.STOPPED;
 			}
 			frame.set(null);
+			audioCaptured = false;
+			audio.clear();
 			keys.clear();
 			commands.clear();
 		}
@@ -333,6 +375,34 @@ public final class VmSession {
 		if (dx != 0 || dy != 0 || b != sentButtons) {
 			client.command("mouse " + dx + " " + dy + " " + b);
 			sentButtons = b;
+		}
+	}
+
+	private void grabAudio() throws IOException {
+		Map<String, Object> r = client.command("audio read");
+		if (!Json.bool(r, "ok", false)) {
+			return;
+		}
+		for (Object o : Json.arr(r, "streams")) {
+			@SuppressWarnings("unchecked")
+			Map<String, Object> st = (Map<String, Object>) o;
+			byte[] pcm = Base64.getDecoder().decode(Json.str(st, "pcm", ""));
+			int frames = pcm.length / 4;
+			if (frames == 0) {
+				continue;
+			}
+			// Positional sound in OpenAL has to be mono.
+			short[] mono = new short[frames];
+			boolean silent = true;
+			for (int i = 0; i < frames; i++) {
+				int l = (short) ((pcm[i * 4] & 0xff) | (pcm[i * 4 + 1] << 8));
+				int rr = (short) ((pcm[i * 4 + 2] & 0xff) | (pcm[i * 4 + 3] << 8));
+				mono[i] = (short) ((l + rr) / 2);
+				silent &= mono[i] == 0;
+			}
+			if (audio.size() < AUDIO_QUEUE_MAX) {
+				audio.add(new AudioChunk(Json.integer(st, "src", 0), Json.integer(st, "rate", 48000), mono, silent));
+			}
 		}
 	}
 

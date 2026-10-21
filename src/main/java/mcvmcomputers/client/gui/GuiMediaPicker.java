@@ -85,9 +85,13 @@ public class GuiMediaPicker extends Screen {
 			int dot = n.lastIndexOf('.');
 			if (f.isFile() && dot > 0 && ext.contains(n.substring(dot + 1).toLowerCase(Locale.ROOT))) {
 				out.add(f);
+			} else if (kind == PacketList.MEDIA_CD && f.isDirectory() && !n.startsWith(".")) {
+				// 86Box turns a folder into a CD on the fly (its "virtual ISO").
+				out.add(f);
 			}
 		}
-		out.sort((a, b) -> a.getName().compareToIgnoreCase(b.getName()));
+		// Folders first, then images.
+		out.sort((a, b) -> a.isDirectory() != b.isDirectory() ? (a.isDirectory() ? -1 : 1) : a.getName().compareToIgnoreCase(b.getName()));
 		return out;
 	}
 
@@ -100,7 +104,8 @@ public class GuiMediaPicker extends Screen {
 		for (File f : files()) {
 			if (y >= 30 && y < this.height - 50) {
 				String name = f.getName();
-				this.addButton(new ButtonWidget(x, y, 300, 14, new LiteralText(this.textRenderer.trimToWidth(name, 290)), b -> {
+				String label = f.isDirectory() ? lang.get("mcvmcomputers.media.folder").replace("%s", name) : name;
+				this.addButton(WideButton.of(x, y, 300, 14, new LiteralText(this.textRenderer.trimToWidth(label, 290)), b -> {
 					setMedia(pc, kind, drive, name);
 					MinecraftClient.getInstance().openScreen(parent);
 				}));
@@ -108,13 +113,13 @@ public class GuiMediaPicker extends Screen {
 			y += 16;
 		}
 		int by = this.height - 28;
-		this.addButton(new ButtonWidget(this.width / 2 - 154, by, 100, 20, new LiteralText(lang.get("mcvmcomputers.media.open_folder")),
+		this.addButton(WideButton.of(this.width / 2 - 154, by, 100, 20, new LiteralText(lang.get("mcvmcomputers.media.open_folder")),
 				b -> Util.getOperatingSystem().open(folder())));
-		this.addButton(new ButtonWidget(this.width / 2 - 50, by, 100, 20, new LiteralText(lang.get("mcvmcomputers.pc_editing.eject")), b -> {
+		this.addButton(WideButton.of(this.width / 2 - 50, by, 100, 20, new LiteralText(lang.get("mcvmcomputers.pc_editing.eject")), b -> {
 			setMedia(pc, kind, drive, "");
 			MinecraftClient.getInstance().openScreen(parent);
 		}));
-		this.addButton(new ButtonWidget(this.width / 2 + 54, by, 100, 20, new LiteralText(lang.get("gui.back")),
+		this.addButton(WideButton.of(this.width / 2 + 54, by, 100, 20, new LiteralText(lang.get("gui.back")),
 				b -> MinecraftClient.getInstance().openScreen(parent)));
 	}
 

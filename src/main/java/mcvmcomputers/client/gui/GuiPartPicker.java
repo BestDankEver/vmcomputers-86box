@@ -149,7 +149,7 @@ public class GuiPartPicker extends Screen {
 				if (why != null) {
 					labels.add(new Object[] { x + 8, y + 12, 0xff5555, why });
 				}
-				ButtonWidget b = this.addButton(new ButtonWidget(x + 240, y, 60, 12, new LiteralText(lang.get("mcvmcomputers.pc_editing.install")),
+				ButtonWidget b = this.addButton(WideButton.of(x + 240, y, 60, 12, new LiteralText(lang.get("mcvmcomputers.pc_editing.install")),
 						w -> install(slot)));
 				b.active = why == null;
 			}
@@ -158,7 +158,7 @@ public class GuiPartPicker extends Screen {
 		if (count == 0) {
 			labels.add(new Object[] { x, 44, 0xaaaaaa, lang.get(filter == Filter.HARD_DISK ? "mcvmcomputers.picker.none_hdd" : "mcvmcomputers.picker.none") });
 		}
-		this.addButton(new ButtonWidget(this.width / 2 - 40, this.height - 28, 80, 20, new LiteralText(lang.get("gui.back")),
+		this.addButton(WideButton.of(this.width / 2 - 40, this.height - 28, 80, 20, new LiteralText(lang.get("gui.back")),
 				w -> MinecraftClient.getInstance().openScreen(parent)));
 	}
 

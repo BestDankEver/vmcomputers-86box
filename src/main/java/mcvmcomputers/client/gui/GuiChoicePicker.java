@@ -83,14 +83,14 @@ public class GuiChoicePicker extends Screen {
 		for (int i = scroll; i < Math.min(shown.size(), scroll + rowsVisible()); i++) {
 			String[] c = shown.get(i);
 			String label = (c[0].equals(current) ? "> " : "") + c[1];
-			this.addButton(new ButtonWidget(this.width / 2 - w / 2, y, w, ROW - 2,
+			this.addButton(WideButton.of(this.width / 2 - w / 2, y, w, ROW - 2,
 					new LiteralText(this.textRenderer.trimToWidth(label, w - 8)), b -> {
 						onPick.accept(c[0]);
 						MinecraftClient.getInstance().openScreen(parent);
 					}));
 			y += ROW;
 		}
-		this.addButton(new ButtonWidget(this.width / 2 - 75, this.height - 28, 150, 20, new TranslatableText("gui.cancel"),
+		this.addButton(WideButton.of(this.width / 2 - 75, this.height - 28, 150, 20, new TranslatableText("gui.cancel"),
 				b -> MinecraftClient.getInstance().openScreen(parent)));
 	}
 
